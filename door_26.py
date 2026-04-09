@@ -219,17 +219,21 @@ class EzdxfDrawer:
     def draw_dim(self, p1, p2, text_pos, rotation, layer, text_override=""):
         # ezdxf 的角度是以度为单位的
         angle_deg = math.degrees(rotation)
+        
+        # 处理文本：如果传了自定义文字就用传的，没传(或为None)就使用 CAD 的默认自动测量值 "<>"
+        actual_text = text_override if text_override else "<>"
+        
         dim = self.ms.add_linear_dim(
             base=text_pos,
             p1=p1,
             p2=p2,
             angle=angle_deg,
-            override=text_override,
+            text=actual_text,  # 🚀 关键修改：原来这里写的是 override=text_override，现在改成了 text=actual_text
             dxfattribs={'layer': layer}
         )
         # ezdxf 必须显式调用 render 才会生成线条
         dim.render()
-
+        
     def draw_text(self, text_str, pos, height, layer):
         self.ms.add_text(
             text_str, 
