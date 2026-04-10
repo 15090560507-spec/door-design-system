@@ -265,12 +265,19 @@ class EzdxfDrawer:
     def draw_dim(self, p1, p2, text_pos, rotation, layer, text_override=""):
         angle_deg = math.degrees(rotation)
         actual_text = text_override if text_override else "<>"
+        
+        # 🚀 核心修改：检查模板中是否有你设置好的样式，如果有就用它！
+        # 如果你以后想换成截图里的 "GB-35-02"，就把这里的 23231 改掉即可
+        target_style = "23231" 
+        style_to_use = target_style if target_style in self.doc.dimstyles else "Standard"
+
         dim = self.ms.add_linear_dim(
             base=text_pos,
             p1=p1,
             p2=p2,
             angle=angle_deg,
             text=actual_text,
+            dimstyle=style_to_use,  # 🚀 强制使用你的专属标注格式
             dxfattribs={'layer': layer}
         )
         dim.render()
@@ -1174,8 +1181,7 @@ def main():
         press_wall = outer_width - overlap
         note_line = f"门套宽/压墙/压框={outer_width}/{press_wall}/{overlap}mm"
         current_note = st.session_state.get("sm", "")
-        final_note = current_note + (
-            "\n" + note_line if current_note.strip() else note_line) if note_line not in current_note else current_note
+        final_note = current_note + ("；" + note_line if current_note.strip() else note_line) if note_line not in current_note else current_note
 
         trim_front = st.session_state["trim_front_in"] if st.session_state["has_outer"] else 0
         trim_back = st.session_state["trim_back_in"] if st.session_state["has_inner"] else 0
