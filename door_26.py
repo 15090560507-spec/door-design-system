@@ -1180,7 +1180,7 @@ def main():
         overlap = st.session_state.get("overlap", 20)
         press_wall = outer_width - overlap
         note_line = f"门套宽/压墙/压框={outer_width}/{press_wall}/{overlap}mm"
-        current_note = st.session_state.get("sm", "")
+        current_note = st.session_state.get("sm", "").replace('\n', '；').replace('\r', '')
         final_note = current_note + ("；" + note_line if current_note.strip() else note_line) if note_line not in current_note else current_note
 
         trim_front = st.session_state["trim_front_in"] if st.session_state["has_outer"] else 0
