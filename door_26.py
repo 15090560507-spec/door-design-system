@@ -796,8 +796,8 @@ def run_integrated_system(info: Dict, checks: Dict, draw_p: Dict, progress_callb
     try:
         progress_callback("正在启动云端图纸引擎...")
 
-        # 加载你放在 data 文件夹里的 template.dxf 图框
-        template_path = os.path.join(DATA_DIR, "template.dxf")
+        # 尝试加载服务器上的模板文件
+        template_path = os.path.join(base_path, "template.dxf")  # 🚀 把 DATA_DIR 改成了 base_path
         if os.path.exists(template_path):
             doc = ezdxf.readfile(template_path)
             progress_callback("已成功加载图框模板。")
