@@ -930,6 +930,12 @@ def set_custom_style():
     .stButton>button { border-radius: 8px; padding: 8px 24px; font-weight: 500; }
     .progress-text { font-size: 12px; color: #6c757d; }
     div[data-testid="stHorizontalBlock"] > div:first-child { padding-right: 16px; }
+    
+    /* 👇 新增：彻底隐藏右上角的所有元素 👇 */
+    .stDeployButton {display:none !important;}  /* 隐藏 Deploy/GitHub 按钮 */
+    header {visibility: hidden !important;}     /* 隐藏整个顶部导航栏 */
+    #MainMenu {visibility: hidden !important;}  /* 隐藏右上角的三个点菜单 */
+    footer {visibility: hidden !important;}     /* 隐藏底部的 Streamlit 水印 */
     </style>
     """, unsafe_allow_html=True)
 
