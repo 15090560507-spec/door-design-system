@@ -2,6 +2,8 @@
 西州将军铜门 - 生产下单系统 (云端无损平替版)
 - 完全保留原版所有功能、计算逻辑和 UI 界面。
 - 底层平滑切换为 ezdxf，完美支持 Streamlit Cloud 部署下载。
+- 修复了单门背面合页方向错误的 Bug。
+- 增强了图框属性抓取能力，无视图块名称变化。
 """
 import sys
 import os
@@ -58,11 +60,10 @@ class Config:
         "标准锁体", "防盗锁体", "霸王锁体", "快装锁体"
     ])
 
-
 CONFIG = Config()
 
 
-# ===================== 管理类 (保持不变) =====================
+# ===================== 管理类 =====================
 class HistoryManager:
     def __init__(self, file_path):
         self.file_path = file_path
@@ -166,7 +167,7 @@ class CustomOptionsManager:
         return result
 
 
-# ===================== 尺寸计算核心 (保持不变) =====================
+# ===================== 尺寸计算核心 =====================
 class DimensionCalculator:
     def __init__(self, params: Dict[str, Any]):
         self.p = params
@@ -230,7 +231,7 @@ class DimensionCalculator:
         return int(max(300, dw)), int(max(600, dh))
 
 
-# ===================== 云端绘图类 (替换 win32com) =====================
+# ===================== 云端绘图类 =====================
 class EzdxfDrawer:
     def __init__(self, doc, ms, hinge_block_name, progress_callback=None):
         self.doc = doc
@@ -244,7 +245,6 @@ class EzdxfDrawer:
         self.progress_callback(msg)
 
     def _setup_hinge_block(self):
-        # 确保图纸中有合页图块，如果没有则创建一个简单的矩形图块代替
         if self.hinge_block_name not in self.doc.blocks:
             block = self.doc.blocks.new(name=self.hinge_block_name)
             points = [(-5, -40), (5, -40), (5, 40), (-5, 40)]
@@ -266,8 +266,6 @@ class EzdxfDrawer:
         angle_deg = math.degrees(rotation)
         actual_text = text_override if text_override else "<>"
         
-        # 🚀 核心修改：检查模板中是否有你设置好的样式，如果有就用它！
-        # 如果你以后想换成截图里的 "GB-35-02"，就把这里的 23231 改掉即可
         target_style = "23231" 
         style_to_use = target_style if target_style in self.doc.dimstyles else "Standard"
 
@@ -277,7 +275,7 @@ class EzdxfDrawer:
             p2=p2,
             angle=angle_deg,
             text=actual_text,
-            dimstyle=style_to_use,  # 🚀 强制使用你的专属标注格式
+            dimstyle=style_to_use,
             dxfattribs={'layer': layer}
         )
         dim.render()
@@ -292,9 +290,8 @@ class EzdxfDrawer:
         self.ms.add_blockref(self.hinge_block_name, insert_point, dxfattribs={'layer': layer})
 
 
-# ===================== 批量文本解析 (保持不变) =====================
+# ===================== 批量文本解析 =====================
 def parse_batch_text(text: str) -> Dict[str, Any]:
-    # (解析逻辑完全保持原版不变，为了篇幅安全完整保留)
     result = {}
     if not text.strip(): return result
     text = text.strip().replace("\n", "").replace(" ", "")
@@ -469,7 +466,7 @@ def parse_batch_text(text: str) -> Dict[str, Any]:
     return result
 
 
-# ===================== 绘图核心函数 (仅修改调用类型，内部逻辑原封不动) =====================
+# ===================== 绘图核心函数 =====================
 def draw_door_in_frame(drawer: EzdxfDrawer, view_name: str, p: Dict, is_back: bool,
                        use_light_size: bool = False, light_w: int = 0, light_h: int = 0):
     drawer.update_progress(f"开始绘制{view_name}门体...")
@@ -756,7 +753,7 @@ def draw_door_in_frame(drawer: EzdxfDrawer, view_name: str, p: Dict, is_back: bo
                                       off((outer_right + x_offset + 50, y1 + (y2 - y1) / 2)), rad90, 'YQ_DIM', text)
     drawer.draw_text(f"{view_name}", off((dw / 2 - 60, outer_top + 300)), 80, 'A-DOOR-mark')
 
-    # ===================== 合页绘制 =====================
+    # ===================== 合页绘制 (🚀 Bug修复区) =====================
     hinge_ys = []
     if hys_count >= 1: hinge_ys.append(panel_y_bot + CONFIG.HINGE_CONFIG["first_offset"])
     if hys_count >= 2: hinge_ys.append(panel_y_top - CONFIG.HINGE_CONFIG["second_offset"])
@@ -768,24 +765,26 @@ def draw_door_in_frame(drawer: EzdxfDrawer, view_name: str, p: Dict, is_back: bo
             break
 
     hinge_x_list = []
+    
+    # 🚀 1. 单门合页逻辑修复
     if door_type == "单门":
         if (nk_choice == "外开" and not is_back) or (nk_choice == "内开" and is_back):
-            hinge_x_list.append(
-                left_width + 5 if door_open_dir in ["左开", "右开" if is_back else "左开"] else dw - right_width - 5)
-    elif door_type == "对开门":
+            if is_back:
+                # 背面（镜像视觉）：左开的合页在右侧，右开的合页在左侧
+                hinge_x_list.append(dw - right_width - 5 if door_open_dir == "左开" else left_width + 5)
+            else:
+                # 正面：左开合页在左侧，右开合页在右侧
+                hinge_x_list.append(left_width + 5 if door_open_dir == "左开" else dw - right_width - 5)
+                
+    # 🚀 2. 对开门与子母门合页逻辑（它们都是在左右两边打合页，精简代码）
+    elif door_type in ["对开门", "子母门"]:
         if (nk_choice == "外开" and not is_back) or (nk_choice == "内开" and is_back):
             hinge_x_list.extend([left_width + 5, dw - right_width - 5])
-    elif door_type == "子母门":
-        if is_back:
-            hinge_x_left, hinge_x_right = (left_width + 5, dw - right_width - 5) if door_open_dir == "右开" else (
-                left_width + 5, dw - right_width - 5)
-        else:
-            hinge_x_left, hinge_x_right = (left_width + 5, dw - right_width - 5)
-        if (nk_choice == "外开" and not is_back) or (nk_choice == "内开" and is_back):
-            hinge_x_list.extend([hinge_x_left, hinge_x_right])
+            
     elif door_type == "折叠四开门":
         if len(panel_positions) >= 4 and ((nk_choice == "外开" and not is_back) or (nk_choice == "内开" and is_back)):
             hinge_x_list = [left_width + 5, panel_positions[0][1] + 5, panel_positions[2][1] + 5, dw - right_width - 5]
+            
     elif door_type == "两定两开":
         if len(panel_positions) >= 4 and ((nk_choice == "外开" and not is_back) or (nk_choice == "内开" and is_back)):
             if has_pillar:
@@ -804,7 +803,7 @@ def run_integrated_system(info: Dict, checks: Dict, draw_p: Dict, progress_callb
         progress_callback("正在启动云端图纸引擎...")
 
         # 尝试加载服务器上的模板文件
-        template_path = os.path.join(base_path, "template.dxf")  # 🚀 把 DATA_DIR 改成了 base_path
+        template_path = os.path.join(base_path, "template.dxf")  
         if os.path.exists(template_path):
             doc = ezdxf.readfile(template_path)
             progress_callback("已成功加载图框模板。")
@@ -814,7 +813,7 @@ def run_integrated_system(info: Dict, checks: Dict, draw_p: Dict, progress_callb
 
         ms = doc.modelspace()
 
-        # ========== 提取所有填表属性 (完全按照你原版对齐) ==========
+        # ========== 提取所有填表属性 ==========
         base_attrs = {
             "DHDW": info.get("DHDW", ""), "GDMC": info.get("GDMC", ""),
             "ZZCL": info.get("ZZCL", ""), "DHRQ": info.get("DHRQ", ""),
@@ -855,16 +854,37 @@ def run_integrated_system(info: Dict, checks: Dict, draw_p: Dict, progress_callb
         qc_text = "玻璃" if qc == "玻璃" else ("封闭" if qc == "封闭" else "无")
         all_attrs = {**base_attrs, **check_attrs}
 
-        # 遍历图框属性并赋值 (平替原版 form_block.GetAttributes())
-        for insert in ms.query('INSERT[name=="ORDER_FORM"]'):
+        # 🚀 ========== 遍历所有块属性并赋值 (无视块名限制，暴力覆盖多行文本) ==========
+        for insert in ms.query('INSERT'):
+            to_replace = []
             for attrib in insert.attribs:
                 tag = attrib.dxf.tag.strip().upper()
-                if tag in all_attrs:
+                
+                # 针对 BZ(备注) 标签，使用强大的 MTEXT 彻底重写，杜绝换行失效或默认值覆盖的问题
+                if tag == "BZ":
+                    pos = attrib.dxf.insert
+                    height = attrib.dxf.height
+                    layer = attrib.dxf.layer
+                    # 创建真正的多行文本覆盖上去
+                    ms.add_mtext(all_attrs["BZ"], dxfattribs={
+                        'insert': pos,
+                        'char_height': height,
+                        'layer': layer,
+                        'style': attrib.dxf.style
+                    }).dxf.width = 1200  # 设定足够宽的界限防止意外折行
+                    to_replace.append(attrib)
+                
+                # 其它普通标签照常写入
+                elif tag in all_attrs:
                     attrib.dxf.text = str(all_attrs[tag])
                 elif tag == "QC_TEXT":
                     attrib.dxf.text = qc_text
                 elif tag == "BZ_TYPE":
                     attrib.dxf.text = "全包" if bz == "全包" else "木箱"
+            
+            # 抹除那些不听话的旧 BZ 标签实体
+            for old_attrib in to_replace:
+                old_attrib.destroy()
 
         # ========== 绘制图形 ==========
         selected_hinge = checks.get('hys', '葫芦头合页')
@@ -893,10 +913,11 @@ def run_integrated_system(info: Dict, checks: Dict, draw_p: Dict, progress_callb
         return "图纸生成成功！", buffer
 
     except Exception as e:
-        return f"生成出错: {str(e)}", None
+        import traceback
+        return f"生成出错: {str(e)}\n{traceback.format_exc()}", None
 
 
-# ===================== 辅助函数 (保持不变) =====================
+# ===================== 辅助函数 =====================
 def parse_gap_str(gap_str: str, default: int = 0) -> Tuple[int, int]:
     if not gap_str.strip(): return (default, default)
     try:
@@ -921,7 +942,7 @@ def parse_dim_str(val_str: str, default_out: float, default_in: float) -> Tuple[
         return (default_out, default_in)
 
 
-# ===================== Streamlit 界面 (全盘原样保留) =====================
+# ===================== Streamlit 界面 =====================
 def set_custom_style():
     st.markdown("""
     <style>
@@ -931,11 +952,11 @@ def set_custom_style():
     .progress-text { font-size: 12px; color: #6c757d; }
     div[data-testid="stHorizontalBlock"] > div:first-child { padding-right: 16px; }
     
-    /* 👇 新增：彻底隐藏右上角的所有元素 👇 */
-    .stDeployButton {display:none !important;}  /* 隐藏 Deploy/GitHub 按钮 */
-    header {visibility: hidden !important;}     /* 隐藏整个顶部导航栏 */
-    #MainMenu {visibility: hidden !important;}  /* 隐藏右上角的三个点菜单 */
-    footer {visibility: hidden !important;}     /* 隐藏底部的 Streamlit 水印 */
+    /* 隐藏右上角元素 */
+    .stDeployButton {display:none !important;}  
+    header {visibility: hidden !important;}     
+    #MainMenu {visibility: hidden !important;}  
+    footer {visibility: hidden !important;}     
     </style>
     """, unsafe_allow_html=True)
 
@@ -1186,9 +1207,10 @@ def main():
         overlap = st.session_state.get("overlap", 20)
         press_wall = outer_width - overlap
         note_line = f"门套宽/压墙/压框={outer_width}/{press_wall}/{overlap}mm"
-        spacer = "                    " # 这里是20个空格，你可以根据图纸宽度增减
-        current_note = st.session_state.get("sm", "").replace('\n', spacer).replace('\r', '')
-        final_note = current_note + (spacer + note_line if current_note.strip() else note_line) if note_line not in current_note else current_note
+        
+        # 🚀 由于加入了 MTEXT 强力重写，这里可以直接拼接最清爽的 "\n" 换行符了！
+        current_note = st.session_state.get("sm", "")
+        final_note = current_note + ("\n" + note_line if current_note.strip() else note_line) if note_line not in current_note else current_note
 
         trim_front = st.session_state["trim_front_in"] if st.session_state["has_outer"] else 0
         trim_back = st.session_state["trim_back_in"] if st.session_state["has_inner"] else 0
