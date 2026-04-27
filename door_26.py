@@ -6,6 +6,8 @@
 - 增强了图框属性抓取能力，无视图块名称变化。
 - [NEW] 修复了平底槛(PDK)打勾与平下槛数值(PXK)的 CAD 属性映射分离问题。
 - [NEW] 新增标配拉手自动插入功能，自动判断开向，精准放置 ZBPLS 与 YBPLS 块。
+- [NEW] 修复高低槛复选框属性名为 GDK。
+- [NEW] 调整气窗标注规则：分为上下两段且只显示数字。
 """
 import sys
 import os
@@ -266,6 +268,7 @@ class EzdxfDrawer:
 
     def draw_dim(self, p1, p2, text_pos, rotation, layer, text_override=""):
         angle_deg = math.degrees(rotation)
+        # 如果 text_override 传进来的是 None，则使用 "<>" (仅数字)
         actual_text = text_override if text_override else "<>"
         
         target_style = "23231" 
@@ -291,7 +294,7 @@ class EzdxfDrawer:
     def insert_hinge_block(self, insert_point, layer="A-DOOR-FRAME"):
         self.ms.add_blockref(self.hinge_block_name, insert_point, dxfattribs={'layer': layer})
 
-    # 🚀 [NEW] 万能自定义插块函数 (用于拉手、花件等)
+    # 万能自定义插块函数 (用于拉手、花件等)
     def insert_custom_block(self, block_name, insert_point, layer="A-DOOR-PANEL"):
         if block_name not in self.doc.blocks:
             # 如果没找到你准备好的拉手块，自动画一个代替矩形防止报错
@@ -750,10 +753,19 @@ def draw_door_in_frame(drawer: EzdxfDrawer, view_name: str, p: Dict, is_back: bo
     if trim_w > 0: dims_v.append(("含包套总高", outer_bottom, outer_top, 400, True, "含包套总高 <>"))
     if has_mm and mm_height > 0 and trim_w > 0: dims_v.append(
         ("门楣高度", dh - O + mm_height, dh - O, 300, True, f"门楣高度 {mm_height}"))
-    if qc_h > 0: dims_v.append(("气窗高度", top_frame_bottom - qc_h, top_frame_bottom, 300, True, f"气窗高度 {qc_h}"))
+    
+    # 🚀 [NEW] 调整后的气窗标注逻辑
+    if qc_h > 0: 
+        mid_frame_top = top_frame_bottom - qc_h
+        # 上段：从中间门框的上侧到最顶端，文本传 None 也就是仅显示数字 <>
+        dims_v.append(("气窗上部高度", mid_frame_top, dh, 200, True, None))
+        # 下段：从底端到中间门框的上侧，同样只显示纯数字
+        dims_v.append(("门板下部高度", 0, mid_frame_top, 200, True, None))
+
     if use_light_size and light_h > 0:
         if (nk_choice == "内开" and not is_back) or (nk_choice == "外开" and is_back):
-            dims_v.append(("见光高", panel_y_bot, panel_y_top, 200, True, f"见光高 {light_h}"))
+            dims_v.append(("见光高", panel_y_bot, panel_y_top, 100, True, f"见光高 {light_h}"))
+            
     dims_v.append(("洞口高", 0, dh, 300, True, None))
 
     for name, x1, x2, y_offset, condition, text in dims_h:
@@ -780,10 +792,8 @@ def draw_door_in_frame(drawer: EzdxfDrawer, view_name: str, p: Dict, is_back: bo
     if door_type == "单门":
         if (nk_choice == "外开" and not is_back) or (nk_choice == "内开" and is_back):
             if is_back:
-                # 背面（镜像视觉）：左开的合页在右侧，右开的合页在左侧
                 hinge_x_list.append(dw - right_width - 5 if door_open_dir == "左开" else left_width + 5)
             else:
-                # 正面：左开合页在左侧，右开合页在右侧
                 hinge_x_list.append(left_width + 5 if door_open_dir == "左开" else dw - right_width - 5)
                 
     elif door_type in ["对开门", "子母门"]:
@@ -805,40 +815,33 @@ def draw_door_in_frame(drawer: EzdxfDrawer, view_name: str, p: Dict, is_back: bo
         for hinge_y in hinge_ys:
             drawer.insert_hinge_block(off((hinge_x, hinge_y)))
             
-    # 🚀 [NEW] ===================== 标配拉手绘制 =====================
-    # 获取当前视图对应的拉手选项
+    # ===================== 标配拉手绘制 =====================
     current_handle = p.get('fmls') if is_back else p.get('zmls')
     
     if current_handle == "标配拉手":
-        handles_to_draw = []  # 存储列表：(x坐标, 块名)
-        handle_y = panel_y_bot + 1000  # 高度统一定位在距离下边 1000mm 处
+        handles_to_draw = []
+        handle_y = panel_y_bot + 1000 
         
         if door_type == "单门":
-            # 计算视觉上的有效开向
             eff_dir = door_open_dir
             if is_back:
                 eff_dir = "右开" if door_open_dir == "左开" else "左开"
                 
             if eff_dir == "左开":
-                # 左开门，把手在门板右侧往里 60mm，使用 ZBPLS
                 handles_to_draw.append((panel_positions[0][1] - 60, "ZBPLS"))
             else:
-                # 右开门，把手在门板左侧往里 60mm，使用 YBPLS
                 handles_to_draw.append((panel_positions[0][0] + 60, "YBPLS"))
                 
         elif door_type in ["对开门", "子母门"]:
-            # 这两种门都是双开结构（左右各一活动扇），取索引 0 和 1
             if len(panel_positions) >= 2:
-                handles_to_draw.append((panel_positions[0][1] - 60, "ZBPLS"))  # 左扇右侧 ZBPLS
-                handles_to_draw.append((panel_positions[1][0] + 60, "YBPLS"))  # 右扇左侧 YBPLS
+                handles_to_draw.append((panel_positions[0][1] - 60, "ZBPLS")) 
+                handles_to_draw.append((panel_positions[1][0] + 60, "YBPLS")) 
                 
         elif door_type in ["折叠四开门", "两定两开"]:
-            # 这两种结构，索引 1 和 2 是中间的活动门扇，两边（0 和 3）是固定扇或折叠扇边门（无标配拉手）
             if len(panel_positions) >= 4:
-                handles_to_draw.append((panel_positions[1][1] - 60, "ZBPLS"))  # 左开活动扇
-                handles_to_draw.append((panel_positions[2][0] + 60, "YBPLS"))  # 右开活动扇
+                handles_to_draw.append((panel_positions[1][1] - 60, "ZBPLS")) 
+                handles_to_draw.append((panel_positions[2][0] + 60, "YBPLS")) 
 
-        # 执行插块
         for hx, hblock in handles_to_draw:
             drawer.insert_custom_block(hblock, off((hx, handle_y)), layer="A-DOOR-PANEL")
 
@@ -849,7 +852,6 @@ def run_integrated_system(info: Dict, checks: Dict, draw_p: Dict, progress_callb
     try:
         progress_callback("正在启动云端图纸引擎...")
 
-        # 尝试加载服务器上的模板文件
         template_path = os.path.join(base_path, "template.dxf")  
         if os.path.exists(template_path):
             doc = ezdxf.readfile(template_path)
@@ -872,8 +874,7 @@ def run_integrated_system(info: Dict, checks: Dict, draw_p: Dict, progress_callb
             "BZ": info.get("BZ", ""), "DOOR_TYPE": info.get("DOOR_TYPE", ""),
             "MOTHER_DOOR_WIDTH": info.get("MOTHER_DOOR_WIDTH", ""),
             "HYYS": info.get("HYYS", ""), "DXK": info.get("DXK", ""),
-            "GXK": info.get("GXK", ""), 
-            "PXK": info.get("PXK", ""),  # 🚀 [NEW] 平底槛数值属性名变更为 PXK
+            "GXK": info.get("GXK", ""), "PXK": info.get("PXK", ""), 
             "MX": info.get("MX", ""), "QC_HEIGHT": info.get("QC_HEIGHT", ""),
             "MM_HEIGHT": info.get("MM_HEIGHT", ""), "ZMKS": info.get("ZMKS", "按图"),
             "FMKS": info.get("FMKS", "按图"),
@@ -901,21 +902,20 @@ def run_integrated_system(info: Dict, checks: Dict, draw_p: Dict, progress_callb
             "QC_GLASS": "√" if qc == "玻璃" else "", "QC_SEAL": "√" if qc == "封闭" else "",
             "BZ_QB": "√" if bz == "全包" else "", "BZ_MX": "√" if bz == "木箱" else "",
             
-            # 🚀 [NEW] 修复平底槛的复选框标记为 PDK
-            "GD_YES": "√" if threshold == "高低槛" else "",
+            # 🚀 [NEW] 修正高低槛复选框为 GDK
+            "GDK": "√" if threshold == "高低槛" else "",
             "PDK": "√" if threshold == "平底槛" else "",
         }
 
         qc_text = "玻璃" if qc == "玻璃" else ("封闭" if qc == "封闭" else "无")
         all_attrs = {**base_attrs, **check_attrs}
 
-        # ========== 遍历所有块属性并赋值 (无视块名限制，暴力覆盖多行文本) ==========
+        # ========== 遍历所有块属性并赋值 ==========
         for insert in ms.query('INSERT'):
             to_replace = []
             for attrib in insert.attribs:
                 tag = attrib.dxf.tag.strip().upper()
                 
-                # 针对 BZ(备注) 标签，使用强大的 MTEXT 彻底重写，杜绝换行失效或默认值覆盖的问题
                 if tag == "BZ":
                     pos = attrib.dxf.insert
                     height = attrib.dxf.height
@@ -928,7 +928,6 @@ def run_integrated_system(info: Dict, checks: Dict, draw_p: Dict, progress_callb
                     }).dxf.width = 1200 
                     to_replace.append(attrib)
                 
-                # 其它普通标签照常写入
                 elif tag in all_attrs:
                     attrib.dxf.text = str(all_attrs[tag])
                 elif tag == "QC_TEXT":
@@ -960,7 +959,6 @@ def run_integrated_system(info: Dict, checks: Dict, draw_p: Dict, progress_callb
         draw_door_in_frame(drawer, "正面", draw_p, False, use_light_size, light_w, light_h)
         draw_door_in_frame(drawer, "背面", draw_p, True, use_light_size, light_w, light_h)
 
-        # 压缩并导出到流
         buffer = io.StringIO()
         doc.write(buffer)
         return "图纸生成成功！", buffer
@@ -1327,7 +1325,7 @@ def main():
             "PILLAR_WIDTH_STR": st.session_state.get("pillar_width_str", "55/70"),
             "HAS_PILLAR": st.session_state.get("has_pillar", False), "HYYS": st.session_state.get("sel_hys", ""),
             "DXK": dxk_val, "GXK": gxk_val, 
-            "PXK": pdk_val, # 🚀 [NEW] 平底槛数值正确赋给 PXK 属性
+            "PXK": pdk_val, 
             "MX": door_type_cn, "QC_HEIGHT": qc_height,
             "HAS_MM": has_mm, "MM_HEIGHT": mm_height, "ZMKS": st.session_state.get("zmks", "按图"),
             "FMKS": st.session_state.get("fmks", "按图"),
@@ -1364,8 +1362,6 @@ def main():
             "middle_gap": st.session_state.get("middle_gap", 0),
             "use_light_size": st.session_state.get("use_light_size", False),
             "light_w": st.session_state.get("light_w", 0), "light_h": st.session_state.get("light_h", 0),
-            
-            # 🚀 [NEW] 将用户在前端选的拉手参数传递到画图模块里
             "zmls": st.session_state.get("zmls", "标配拉手"),
             "fmls": st.session_state.get("fmls", "标配拉手"),
         }
