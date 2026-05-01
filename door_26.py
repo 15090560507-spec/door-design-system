@@ -1,9 +1,9 @@
 """
-西州将军铜门 - 生产协同管理系统 (SaaS 尊享版)
-- 完全遵循 PEP8 标准缩进，杜绝任何分号压缩引发的 SyntaxError。
-- Apple/iOS 高级视觉语言，顶部反馈式导航，悬浮卡片 UI。
-- 内置超级管理员后台，完整的多用户权限与登录拦截。
-- 引入客户参考图流转与审核端原生全屏放大审查。
+西州将军铜门 - 生产协同管理系统 (SaaS 尊享视觉优化版)
+- 优化：输入框增加清晰描边边界，不再模糊。
+- 优化：顶部导航选中状态采用原生 Primary 渲染，状态对比极其醒目。
+- 优化：上传组件支持拖拽与 Ctrl+V 快捷截图粘贴。
+- 完全遵循 PEP8 标准缩进，代码清爽安全。
 """
 import sys
 import os
@@ -68,7 +68,6 @@ class UserDatabaseManager:
     def __init__(self, file_path):
         self.file_path = file_path
         if not os.path.exists(self.file_path):
-            # 初始化默认账号
             default_users = {
                 "admin": {"password": "888888", "role": "超级管理员", "name": "系统管理员", "default_module": "后台管理"},
                 "A": {"password": "123", "role": "录入员", "name": "销售录入", "default_module": "图纸信息录入"},
@@ -114,7 +113,7 @@ class UserDatabaseManager:
 
     def delete_user(self, uid: str):
         users = self.load_all_users()
-        if uid in users and uid != "admin": # 保护 admin
+        if uid in users and uid != "admin":
             del users[uid]
             self.save(users)
 
@@ -265,33 +264,6 @@ def set_custom_style():
     
     /* 隐藏默认占位 */
     header, footer, .stDeployButton { visibility: hidden !important; display: none !important; }
-    
-    /* ======== 顶部高级导航按钮 ======== */
-    /* 针对我们包在 .nav-btn-container 里的按钮进行拦截 */
-    .nav-btn-active > button {
-        background-color: #1C1C1E !important;
-        color: #FFFFFF !important;
-        border: none !important;
-        border-radius: 8px !important;
-        font-weight: 600 !important;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.15) !important;
-        transition: transform 0.1s ease;
-    }
-    .nav-btn-active > button:active { transform: scale(0.95); }
-
-    .nav-btn-inactive > button {
-        background-color: #FFFFFF !important;
-        color: #8E8E93 !important;
-        border: 1px solid #E5E5EA !important;
-        border-radius: 8px !important;
-        font-weight: 500 !important;
-        transition: all 0.2s ease;
-    }
-    .nav-btn-inactive > button:hover {
-        color: #1C1C1E !important;
-        border-color: #C7C7CC !important;
-    }
-    .nav-btn-inactive > button:active { transform: scale(0.95); }
 
     /* ======== 容器悬浮卡片 ======== */
     div[data-testid="stVerticalBlock"] > div > div[data-testid="stVerticalBlockBorderWrapper"] {
@@ -306,16 +278,17 @@ def set_custom_style():
         box-shadow: 0 8px 30px rgba(0,0,0,0.08) !important;
     }
     
-    /* ======== 交互输入框精致化 ======== */
-    .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] > div {
+    /* ======== 交互输入框精致化与【明确边界】 ======== */
+    /* 添加了明显的 border: 1px solid #C7C7CC */
+    .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] > div, .stTextArea textarea {
         font-size: 14px !important; 
         border-radius: 6px !important; 
-        min-height: 36px !important;
-        background-color: #F2F2F7 !important; 
-        border: 1px solid transparent !important;
+        min-height: 38px !important;
+        background-color: #FAFAFC !important; 
+        border: 1px solid #C7C7CC !important;  
         transition: all 0.2s ease;
     }
-    .stTextInput input:focus, .stSelectbox div[data-baseweb="select"] > div:focus-within {
+    .stTextInput input:focus, .stNumberInput input:focus, .stSelectbox div[data-baseweb="select"] > div:focus-within, .stTextArea textarea:focus {
         background-color: #FFFFFF !important; 
         border: 1px solid #007AFF !important;
         box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15) !important;
@@ -333,6 +306,30 @@ def set_custom_style():
         margin-bottom: 16px !important; 
         padding-bottom: 10px !important; 
         border-bottom: 1px solid #F2F2F7; 
+    }
+
+    /* ======== 按钮基础样式 ======== */
+    .stButton > button { 
+        border-radius: 8px !important; 
+        font-weight: 600 !important; 
+        transition: transform 0.1s ease, box-shadow 0.1s ease !important;
+    }
+    .stButton > button:active {
+        transform: scale(0.97) !important;
+    }
+    .stButton > button[kind="primary"] { 
+        background-color: #007AFF !important; 
+        color: white !important; 
+        border: none !important; 
+        box-shadow: 0 4px 10px rgba(0, 122, 255, 0.2) !important;
+    }
+    .stButton > button[kind="secondary"] { 
+        background-color: #FFFFFF !important; 
+        color: #1C1C1E !important; 
+        border: 1px solid #C7C7CC !important; 
+    }
+    div[data-testid="column"] { 
+        padding: 0 6px !important; 
     }
 
     /* ======== 图纸点击卡片 (伪装成按钮) ======== */
@@ -358,7 +355,7 @@ def set_custom_style():
     .delete-btn > button {
         background-color: #FFF0F0 !important;
         color: #FF3B30 !important;
-        border: none !important;
+        border: 1px solid #FFD1D1 !important;
         border-radius: 10px !important;
         height: 100% !important;
     }
@@ -1717,7 +1714,7 @@ def generate_cad_trigger(history_mgr):
     return info_map, check_map, draw_params
 
 
-# ===================== 登录拦截与后台 =====================
+# ===================== 登录拦截 =====================
 def render_login():
     st.markdown("<div style='height: 10vh;'></div>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align:center; color:#1C1C1E; font-weight:700;'>🏭 西州将军 - 智能协同平台</h2>", unsafe_allow_html=True)
@@ -1783,7 +1780,6 @@ def render_admin_dashboard():
 def render_top_nav():
     st.markdown("<div style='padding-top:10px;'></div>", unsafe_allow_html=True)
     
-    # 动态计算导航列
     nav_items = [
         {"title": "📝 图纸信息录入", "module": "图纸信息录入"},
         {"title": "📐 图纸绘制", "module": "图纸绘制"},
@@ -1794,19 +1790,22 @@ def render_top_nav():
         nav_items.append({"title": "⚙️ 后台管理", "module": "后台管理"})
         
     num_navs = len(nav_items)
-    # 分配列比例：前面的导航平分，最后留出一列放退出按钮
     cols = st.columns([2] * num_navs + [1, 2])
     
     for i, item in enumerate(nav_items):
-        is_active = (st.session_state["current_module"] == item["module"])
-        cls_name = "nav-btn-active" if is_active else "nav-btn-inactive"
+        is_active = False
+        if st.session_state["current_module"] == item["module"]:
+            is_active = True
+            
         with cols[i]:
-            st.markdown(f'<div class="{cls_name}">', unsafe_allow_html=True)
-            if st.button(item["title"], use_container_width=True, key=f"nav_{item['module']}"):
-                st.session_state["current_module"] = item["module"]
-                st.session_state["active_task_id"] = None
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
+            if is_active:
+                if st.button(item["title"], use_container_width=True, type="primary", key=f"nav_{item['module']}"):
+                    pass
+            else:
+                if st.button(item["title"], use_container_width=True, type="secondary", key=f"nav_{item['module']}"):
+                    st.session_state["current_module"] = item["module"]
+                    st.session_state["active_task_id"] = None
+                    st.rerun()
 
     with cols[-1]:
         st.markdown(f"<div style='text-align:right; color:#8E8E93; font-size:13px; margin-top:2px;'>{st.session_state['user_name']}</div>", unsafe_allow_html=True)
@@ -1851,7 +1850,7 @@ def main():
                 st.rerun()
         
         st.markdown("#### 🖼️ 客户沟通记录与参考图")
-        ref_img_file = st.file_uploader("上传客户发来的手稿、现场图或聊天截图 (方便后续流转参考)", type=['jpg', 'png', 'jpeg'])
+        ref_img_file = st.file_uploader("📥 拖拽图片到此处，或点击框内按 Ctrl+V (Mac按 Cmd+V) 直接粘贴截图", type=['jpg', 'png', 'jpeg'], accept_multiple_files=False)
         ref_img_b64 = None
         if ref_img_file is not None:
             ref_img_b64 = base64.b64encode(ref_img_file.getvalue()).decode('utf-8')
@@ -1883,7 +1882,8 @@ def main():
         with c2:
             if st.button("⚡ 快速生成CAD (仅下载不流转)", type="secondary", use_container_width=True):
                 info_map, check_map, draw_params = generate_cad_trigger(history_mgr)
-                def prog_cb(m): pass
+                def prog_cb(m): 
+                    pass
                 result, buffer = run_integrated_system(info_map, check_map, draw_params, prog_cb)
                 if buffer: 
                     st.download_button("⬇️ 点击下载 DXF", data=buffer.getvalue(), file_name=f"排版图纸_{st.session_state['dhdw']}.dxf", mime="application/dxf", use_container_width=True)
@@ -1924,13 +1924,14 @@ def main():
             with c_gen:
                 if st.button("⚡ 生成基准 CAD 底图", type="secondary", use_container_width=True):
                     info_map, check_map, draw_params = generate_cad_trigger(history_mgr)
-                    def prog_cb(m): pass
+                    def prog_cb(m): 
+                        pass
                     result, buffer = run_integrated_system(info_map, check_map, draw_params, prog_cb)
                     if buffer: 
                         st.download_button("⬇️ 下载 DXF 进行深化", data=buffer.getvalue(), file_name=f"基准图纸_{active_task['id']}.dxf", mime="application/dxf", use_container_width=True)
             
             with c_upload:
-                uploaded_file = st.file_uploader("📥 上传深化完成的图纸图片 (JPG/PNG)，提交给总工审核", label_visibility="collapsed")
+                uploaded_file = st.file_uploader("📥 上传深化完成的图纸图片 (支持拖拽/截图粘贴)，提交给总工审核", label_visibility="collapsed")
                 if st.button("📤 提交审核", type="primary", use_container_width=True):
                     if uploaded_file is not None:
                         img_b64 = base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
@@ -1962,7 +1963,6 @@ def main():
                     with st.container():
                         col_card, col_del = st.columns([9.2, 0.8])
                         with col_card:
-                            # 伪装成卡片的按钮
                             st.markdown('<div class="drawing-card-btn">', unsafe_allow_html=True)
                             btn_text = f"📂 {task['customer']} - {task['project']} \n\n 门型：{task['door_type']} | 洞口：{task['size']} | 状态：{task['status']}"
                             if st.button(btn_text, key=f"btn_{task['id']}", use_container_width=True):
@@ -1994,7 +1994,7 @@ def main():
             c_img, c_info = st.columns([6, 4])
             with c_img:
                 st.markdown("#### 图纸预览")
-                st.caption("🔍 提示：将鼠标悬浮在图片上，点击右上角的无损展开图标 [ ⤢ ] 即可全屏放大审查。")
+                st.caption("🔍 提示：鼠标停在图片上，点击右上角 `⤢` 即可全屏放大。")
                 if active_task.get("drawing_img_b64"):
                     try:
                         img_bytes = base64.b64decode(active_task["drawing_img_b64"])
@@ -2056,7 +2056,7 @@ def main():
                                 st.rerun()
                             st.markdown('</div>', unsafe_allow_html=True)
                         with col_action:
-                            pass # 留空或放置快捷通过按钮
+                            pass 
 
 if __name__ == "__main__":
     main()
