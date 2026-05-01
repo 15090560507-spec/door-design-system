@@ -1,3 +1,10 @@
+"""
+西州将军铜门 - 生产协同管理系统 (SaaS 尊享版)
+- 完全遵循 PEP8 标准缩进，杜绝任何分号压缩引发的 SyntaxError。
+- Apple/iOS 高级视觉语言，顶部反馈式导航，悬浮卡片 UI。
+- 内置超级管理员后台，完整的多用户权限与登录拦截。
+- 引入客户参考图流转与审核端原生全屏放大审查。
+"""
 import sys
 import os
 import uuid
@@ -24,13 +31,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 HISTORY_FILE = os.path.join(DATA_DIR, 'order_history.json')
 CUSTOM_OPTIONS_FILE = os.path.join(DATA_DIR, 'custom_options.json')
 TASKS_DB_FILE = os.path.join(DATA_DIR, 'tasks_database.json')
-
-# ===================== 用户权限配置 =====================
-USERS_DB = {
-    "A": {"password": "123", "role": "录入员", "name": "销售-小A", "default_module": "图纸信息录入"},
-    "B": {"password": "123", "role": "绘图员", "name": "绘图-小B", "default_module": "图纸绘制"},
-    "C": {"password": "123", "role": "总工",   "name": "总工-小C", "default_module": "图纸审核"}
-}
+USERS_DB_FILE = os.path.join(DATA_DIR, 'users_database.json')
 
 # ===================== 核心配置 =====================
 @dataclass
@@ -62,7 +63,64 @@ class Config:
 
 CONFIG = Config()
 
-# ===================== 数据库管理引擎 =====================
+# ===================== 数据库引擎：用户权限 =====================
+class UserDatabaseManager:
+    def __init__(self, file_path):
+        self.file_path = file_path
+        if not os.path.exists(self.file_path):
+            # 初始化默认账号
+            default_users = {
+                "admin": {"password": "888888", "role": "超级管理员", "name": "系统管理员", "default_module": "后台管理"},
+                "A": {"password": "123", "role": "录入员", "name": "销售录入", "default_module": "图纸信息录入"},
+                "B": {"password": "123", "role": "绘图员", "name": "技术深化", "default_module": "图纸绘制"},
+                "C": {"password": "123", "role": "总工", "name": "审核总工", "default_module": "图纸审核"}
+            }
+            self.save(default_users)
+
+    def load_all_users(self) -> Dict:
+        try:
+            with open(self.file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def save(self, users: Dict):
+        with open(self.file_path, 'w', encoding='utf-8') as f:
+            json.dump(users, f, ensure_ascii=False, indent=2)
+
+    def authenticate(self, uid: str, pwd: str) -> Optional[Dict]:
+        users = self.load_all_users()
+        if uid in users and users[uid]["password"] == pwd:
+            user_info = users[uid].copy()
+            user_info["uid"] = uid
+            return user_info
+        return None
+
+    def add_or_update_user(self, uid: str, pwd: str, role: str, name: str):
+        users = self.load_all_users()
+        module_map = {
+            "超级管理员": "后台管理",
+            "录入员": "图纸信息录入",
+            "绘图员": "图纸绘制",
+            "总工": "图纸审核"
+        }
+        users[uid] = {
+            "password": pwd,
+            "role": role,
+            "name": name,
+            "default_module": module_map.get(role, "图纸信息录入")
+        }
+        self.save(users)
+
+    def delete_user(self, uid: str):
+        users = self.load_all_users()
+        if uid in users and uid != "admin": # 保护 admin
+            del users[uid]
+            self.save(users)
+
+user_db = UserDatabaseManager(USERS_DB_FILE)
+
+# ===================== 数据库引擎：任务流转 =====================
 class TaskDatabaseManager:
     def __init__(self, file_path):
         self.file_path = file_path
@@ -110,6 +168,7 @@ class TaskDatabaseManager:
 
 task_db = TaskDatabaseManager(TASKS_DB_FILE)
 
+# ===================== 本地字典记忆类 =====================
 class HistoryManager:
     def __init__(self, file_path):
         self.file_path = file_path
@@ -193,114 +252,133 @@ class CustomOptionsManager:
         custom = self.load().get("hinges", [])
         return list(dict.fromkeys(custom + list(CONFIG.HINGE_TYPES.keys())))
 
-# ===================== UI 深度重构与工作流 =====================
+
+# ===================== UI 深度重构高级系统 (Apple Style) =====================
 def set_custom_style():
     st.markdown("""
     <style>
-    .stApp { background-color: #F5F5F7; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    /* 全局高级背景调色与字体 */
+    .stApp { 
+        background-color: #F2F2F7; 
+        font-family: "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+    }
+    
+    /* 隐藏默认占位 */
     header, footer, .stDeployButton { visibility: hidden !important; display: none !important; }
     
-    /* 顶部导航方形按钮样式 */
-    .nav-active > button { 
-        background-color: #1D1D1F !important; 
-        color: white !important; 
-        border: 1px solid #1D1D1F !important; 
-        border-radius: 4px !important; 
+    /* ======== 顶部高级导航按钮 ======== */
+    /* 针对我们包在 .nav-btn-container 里的按钮进行拦截 */
+    .nav-btn-active > button {
+        background-color: #1C1C1E !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15) !important;
+        transition: transform 0.1s ease;
     }
-    .nav-inactive > button { 
-        background-color: #FFFFFF !important; 
-        color: #1D1D1F !important; 
-        border: 1px solid #E5E5EA !important; 
-        border-radius: 4px !important; 
+    .nav-btn-active > button:active { transform: scale(0.95); }
+
+    .nav-btn-inactive > button {
+        background-color: #FFFFFF !important;
+        color: #8E8E93 !important;
+        border: 1px solid #E5E5EA !important;
+        border-radius: 8px !important;
+        font-weight: 500 !important;
+        transition: all 0.2s ease;
     }
-    
-    /* 容器卡片样式 */
+    .nav-btn-inactive > button:hover {
+        color: #1C1C1E !important;
+        border-color: #C7C7CC !important;
+    }
+    .nav-btn-inactive > button:active { transform: scale(0.95); }
+
+    /* ======== 容器悬浮卡片 ======== */
     div[data-testid="stVerticalBlock"] > div > div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FFFFFF !important; 
-        border-radius: 8px !important; 
-        border: none !important;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important; 
-        padding: 16px 20px !important;
+        border-radius: 12px !important; 
+        border: 1px solid rgba(0,0,0,0.05) !important;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.03) !important; 
+        padding: 20px 24px !important;
+        transition: box-shadow 0.3s ease;
+    }
+    div[data-testid="stVerticalBlock"] > div > div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+        box-shadow: 0 8px 30px rgba(0,0,0,0.08) !important;
     }
     
-    /* 输入框微缩 */
+    /* ======== 交互输入框精致化 ======== */
     .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] > div {
-        font-size: 13px !important; 
-        border-radius: 4px !important; 
-        min-height: 32px !important;
-        background-color: #F9F9FB !important; 
+        font-size: 14px !important; 
+        border-radius: 6px !important; 
+        min-height: 36px !important;
+        background-color: #F2F2F7 !important; 
         border: 1px solid transparent !important;
+        transition: all 0.2s ease;
     }
     .stTextInput input:focus, .stSelectbox div[data-baseweb="select"] > div:focus-within {
         background-color: #FFFFFF !important; 
         border: 1px solid #007AFF !important;
+        box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15) !important;
     }
     label, .stRadio label, .stCheckbox label { 
-        font-size: 12px !important; 
+        font-size: 13px !important; 
         font-weight: 500 !important; 
-        color: #86868B !important; 
-        margin-bottom: -4px !important; 
+        color: #8E8E93 !important; 
+        margin-bottom: -2px !important; 
     }
     h4 { 
-        font-size: 16px !important; 
+        font-size: 17px !important; 
         font-weight: 600 !important; 
-        color: #1D1D1F !important; 
+        color: #1C1C1E !important; 
         margin-bottom: 16px !important; 
-        padding-bottom: 8px !important; 
-        border-bottom: 1px solid #E5E5EA; 
+        padding-bottom: 10px !important; 
+        border-bottom: 1px solid #F2F2F7; 
     }
 
-    /* 按钮基础样式 */
-    .stButton > button { 
-        border-radius: 6px !important; 
-        font-weight: 600 !important; 
+    /* ======== 图纸点击卡片 (伪装成按钮) ======== */
+    .drawing-card-btn > button {
+        background-color: #FFFFFF !important;
+        border: 1px solid #E5E5EA !important;
+        border-radius: 10px !important;
+        text-align: left !important;
+        padding: 16px 20px !important;
+        height: 100% !important;
+        color: #1C1C1E !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02) !important;
+        transition: all 0.2s ease;
     }
-    .stButton > button[kind="primary"] { 
-        background-color: #007AFF !important; 
-        color: white !important; 
-        border: none !important; 
+    .drawing-card-btn > button:hover {
+        border-color: #007AFF !important;
+        box-shadow: 0 6px 16px rgba(0, 122, 255, 0.1) !important;
+        transform: translateY(-2px);
     }
-    .stButton > button[kind="secondary"] { 
-        background-color: #F2F2F7 !important; 
-        color: #007AFF !important; 
-        border: none !important; 
+    .drawing-card-btn > button:active { transform: scale(0.98); }
+
+    /* ======== 红色删除按钮 ======== */
+    .delete-btn > button {
+        background-color: #FFF0F0 !important;
+        color: #FF3B30 !important;
+        border: none !important;
+        border-radius: 10px !important;
+        height: 100% !important;
     }
-    div[data-testid="column"] { 
-        padding: 0 6px !important; 
+    .delete-btn > button:hover {
+        background-color: #FF3B30 !important;
+        color: #FFFFFF !important;
     }
-    
+
     /* 状态徽章 */
     .badge { 
         display: inline-block; 
-        padding: 4px 10px; 
+        padding: 4px 12px; 
         border-radius: 12px; 
         font-size: 12px; 
         font-weight: 600; 
     }
-    .badge-pending { background-color: #E5E5EA; color: #1D1D1F; }
+    .badge-pending { background-color: #F2F2F7; color: #1C1C1E; }
     .badge-review { background-color: #FFF5E5; color: #FF9500; }
     .badge-modify { background-color: #FFE5E5; color: #FF3B30; }
     .badge-success { background-color: #E5FBE5; color: #34C759; }
-    
-    /* 列表卡片 */
-    .task-card { 
-        background: #FFF; 
-        border: 1px solid #E5E5EA; 
-        border-radius: 8px; 
-        padding: 16px; 
-        margin-bottom: 8px; 
-        box-shadow: 0 1px 2px rgba(0,0,0,0.02); 
-    }
-    .task-title { 
-        font-size: 16px; 
-        font-weight: 600; 
-        color: #1D1D1F; 
-        margin-bottom: 4px; 
-    }
-    .task-sub { 
-        font-size: 13px; 
-        color: #86868B; 
-    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -311,6 +389,8 @@ def init_session_state():
         st.session_state["user_id"] = None
     if "user_name" not in st.session_state: 
         st.session_state["user_name"] = None
+    if "user_role" not in st.session_state: 
+        st.session_state["user_role"] = None
     if "current_module" not in st.session_state: 
         st.session_state["current_module"] = None
     if "active_task_id" not in st.session_state: 
@@ -351,6 +431,7 @@ def get_status_badge(status):
     }
     css_class = mapping.get(status, "badge-pending")
     return f'<span class="badge {css_class}">{status}</span>'
+
 
 # ===================== 表单与解析组件 =====================
 class DimensionCalculator:
@@ -990,7 +1071,14 @@ def draw_door_in_frame(drawer: EzdxfDrawer, view_name: str, p: Dict, is_back: bo
         handle_y = panel_y_bot + 1000 
         
         if door_type == "单门":
-            eff_dir = "右开" if (is_back and door_open_dir == "左开") else ("左开" if is_back else door_open_dir)
+            if is_back:
+                if door_open_dir == "左开":
+                    eff_dir = "右开"
+                else:
+                    eff_dir = "左开"
+            else:
+                eff_dir = door_open_dir
+                
             if eff_dir == "左开":
                 handles_to_draw.append((panel_positions[0][1] - 60, "ZBPLS"))
             else:
@@ -1020,13 +1108,32 @@ def run_integrated_system(info: Dict, checks: Dict, draw_p: Dict, progress_callb
         ms = doc.modelspace()
 
         base_attrs = {
-            "DHDW": info.get("DHDW", ""), "GDMC": info.get("GDMC", ""), "ZZCL": info.get("ZZCL", ""), "DHRQ": info.get("DHRQ", ""),
-            "DDH": info.get("DDH", ""), "SL": info.get("SL", ""), "YS": info.get("YS", ""), "ZMLS": info.get("ZMLS", ""),
-            "FMLS": info.get("FMLS", ""), "ST": info.get("ST", ""), "HYSL": info.get("HYSL", ""), "QH": info.get("QH", ""),
-            "MSHD": info.get("MSHD", ""), "HHXD": info.get("HHXD", ""), "BZ": info.get("BZ", ""), "DOOR_TYPE": info.get("DOOR_TYPE", ""),
-            "MOTHER_DOOR_WIDTH": info.get("MOTHER_DOOR_WIDTH", ""), "HYYS": info.get("HYYS", ""), "DXK": info.get("DXK", ""),
-            "GXK": info.get("GXK", ""), "PXK": info.get("PXK", ""), "MX": info.get("MX", ""), "QC_HEIGHT": info.get("QC_HEIGHT", ""),
-            "MM_HEIGHT": info.get("MM_HEIGHT", ""), "ZMKS": info.get("ZMKS", "按图"), "FMKS": info.get("FMKS", "按图"),
+            "DHDW": info.get("DHDW", ""), 
+            "GDMC": info.get("GDMC", ""), 
+            "ZZCL": info.get("ZZCL", ""), 
+            "DHRQ": info.get("DHRQ", ""),
+            "DDH": info.get("DDH", ""), 
+            "SL": info.get("SL", ""), 
+            "YS": info.get("YS", ""), 
+            "ZMLS": info.get("ZMLS", ""),
+            "FMLS": info.get("FMLS", ""), 
+            "ST": info.get("ST", ""), 
+            "HYSL": info.get("HYSL", ""), 
+            "QH": info.get("QH", ""),
+            "MSHD": info.get("MSHD", ""), 
+            "HHXD": info.get("HHXD", ""), 
+            "BZ": info.get("BZ", ""), 
+            "DOOR_TYPE": info.get("DOOR_TYPE", ""),
+            "MOTHER_DOOR_WIDTH": info.get("MOTHER_DOOR_WIDTH", ""), 
+            "HYYS": info.get("HYYS", ""), 
+            "DXK": info.get("DXK", ""),
+            "GXK": info.get("GXK", ""), 
+            "PXK": info.get("PXK", ""), 
+            "MX": info.get("MX", ""), 
+            "QC_HEIGHT": info.get("QC_HEIGHT", ""),
+            "MM_HEIGHT": info.get("MM_HEIGHT", ""), 
+            "ZMKS": info.get("ZMKS", "按图"), 
+            "FMKS": info.get("FMKS", "按图"),
         }
         
         nk = checks.get("nk", "内开")
@@ -1035,8 +1142,13 @@ def run_integrated_system(info: Dict, checks: Dict, draw_p: Dict, progress_callb
         bz = checks.get("bz", "全包")
         threshold = checks.get("threshold", "高低槛")
         
-        has_pillar = (checks.get("lz", "无") == "有")
-        has_mm = (checks.get("mm", "无") == "有")
+        has_pillar = False
+        if checks.get("lz", "无") == "有":
+            has_pillar = True
+            
+        has_mm = False
+        if checks.get("mm", "无") == "有":
+            has_mm = True
         
         check_attrs = {
             "OUTER": "√" if "外" in checks.get("bb", []) else "",
@@ -1064,7 +1176,12 @@ def run_integrated_system(info: Dict, checks: Dict, draw_p: Dict, progress_callb
             for attrib in insert.attribs:
                 tag = attrib.dxf.tag.strip().upper()
                 if tag == "BZ":
-                    ms.add_mtext(all_attrs["BZ"], dxfattribs={'insert': attrib.dxf.insert, 'char_height': attrib.dxf.height, 'layer': attrib.dxf.layer, 'style': attrib.dxf.style}).dxf.width = 1200 
+                    ms.add_mtext(all_attrs["BZ"], dxfattribs={
+                        'insert': attrib.dxf.insert, 
+                        'char_height': attrib.dxf.height, 
+                        'layer': attrib.dxf.layer, 
+                        'style': attrib.dxf.style
+                    }).dxf.width = 1200 
                     to_replace.append(attrib)
                 elif tag in all_attrs:
                     attrib.dxf.text = str(all_attrs[tag])
@@ -1076,13 +1193,24 @@ def run_integrated_system(info: Dict, checks: Dict, draw_p: Dict, progress_callb
                     else:
                         attrib.dxf.text = "无"
                 elif tag == "BZ_TYPE":
-                    attrib.dxf.text = "全包" if bz == "全包" else "木箱"
+                    if bz == "全包":
+                        attrib.dxf.text = "全包"
+                    else:
+                        attrib.dxf.text = "木箱"
             
             for old_attrib in to_replace:
                 old_attrib.destroy()
 
-        drawer = EzdxfDrawer(doc, ms, CONFIG.HINGE_TYPES.get(checks.get('hys', '葫芦头合页'), "hlt"), progress_callback)
-        drawer.batch_add_layers({"A-DOOR-FRAME": 4, "A-DOOR-PANEL": 2, "A-DOOR-TRIM": 1, "YQ_DIM": 3, "A-DOOR-mark": 7})
+        sel_hys = checks.get('hys', '葫芦头合页')
+        hinge_name = CONFIG.HINGE_TYPES.get(sel_hys, "hlt")
+        drawer = EzdxfDrawer(doc, ms, hinge_name, progress_callback)
+        drawer.batch_add_layers({
+            "A-DOOR-FRAME": 4, 
+            "A-DOOR-PANEL": 2, 
+            "A-DOOR-TRIM": 1, 
+            "YQ_DIM": 3, 
+            "A-DOOR-mark": 7
+        })
 
         draw_p.update({
             "door_type": info.get("DOOR_TYPE", "单门"), 
@@ -1095,8 +1223,12 @@ def run_integrated_system(info: Dict, checks: Dict, draw_p: Dict, progress_callb
             "mm_height": info.get("MM_HEIGHT", 200)
         })
         
-        draw_door_in_frame(drawer, "正面", draw_p, False, draw_p.get("use_light_size", False), draw_p.get("light_w", 0), draw_p.get("light_h", 0))
-        draw_door_in_frame(drawer, "背面", draw_p, True, draw_p.get("use_light_size", False), draw_p.get("light_w", 0), draw_p.get("light_h", 0))
+        use_light = draw_p.get("use_light_size", False)
+        lw = draw_p.get("light_w", 0)
+        lh = draw_p.get("light_h", 0)
+        
+        draw_door_in_frame(drawer, "正面", draw_p, False, use_light, lw, lh)
+        draw_door_in_frame(drawer, "背面", draw_p, True, use_light, lw, lh)
 
         buffer = io.StringIO()
         doc.write(buffer)
@@ -1145,6 +1277,7 @@ def render_main_form(options_mgr):
             c5, c6 = st.columns(2)
             st.session_state["sl"] = c5.text_input("数量(樘)", value=st.session_state["sl"])
             st.session_state["hhxd"] = c6.text_input("制单人", value=st.session_state["hhxd"])
+            
         with st.container(border=True):
             st.markdown("#### 🎨 材质与外观")
             c1, c2 = st.columns(2)
@@ -1169,23 +1302,35 @@ def render_main_form(options_mgr):
             st.session_state["qh"] = c6.text_input("墙厚(mm)", value=st.session_state["qh"], placeholder="选填")
             
             bz_options = ["全包", "木箱"]
-            bz_index = bz_options.index(st.session_state["sel_bz"]) if st.session_state["sel_bz"] in bz_options else 0
+            if st.session_state["sel_bz"] in bz_options:
+                bz_index = bz_options.index(st.session_state["sel_bz"])
+            else:
+                bz_index = 0
             st.session_state["sel_bz"] = st.radio("包装方式", bz_options, horizontal=True, index=bz_index)
 
     with col_mid:
         with st.container(border=True):
             st.markdown("#### 📐 结构与开向")
             dt_options = ["单门", "对开门", "子母门", "两定两开", "折叠四开门"]
-            dt_index = dt_options.index(st.session_state["door_type"]) if st.session_state["door_type"] in dt_options else 0
+            if st.session_state["door_type"] in dt_options:
+                dt_index = dt_options.index(st.session_state["door_type"])
+            else:
+                dt_index = 0
             st.session_state["door_type"] = st.selectbox("门型", dt_options, index=dt_index)
             
             c1, c2 = st.columns(2)
             kx_options = ["左开", "右开"]
-            kx_index = kx_options.index(st.session_state["sel_kx"]) if st.session_state["sel_kx"] in kx_options else 1
+            if st.session_state["sel_kx"] in kx_options:
+                kx_index = kx_options.index(st.session_state["sel_kx"])
+            else:
+                kx_index = 1
             st.session_state["sel_kx"] = c1.radio("左右开向", kx_options, horizontal=True, index=kx_index)
             
             nk_options = ["内开", "外开"]
-            nk_index = nk_options.index(st.session_state["sel_nk"]) if st.session_state["sel_nk"] in nk_options else 0
+            if st.session_state["sel_nk"] in nk_options:
+                nk_index = nk_options.index(st.session_state["sel_nk"])
+            else:
+                nk_index = 0
             st.session_state["sel_nk"] = c2.radio("内外开向", nk_options, horizontal=True, index=nk_index)
             
         with st.container(border=True):
@@ -1198,6 +1343,7 @@ def render_main_form(options_mgr):
             else:
                 st.session_state["dw"] = c1.number_input("洞口总宽(W)", value=st.session_state["dw"], step=10)
                 st.session_state["dh"] = c2.number_input("洞口总高(H)", value=st.session_state["dh"], step=10)
+            
             if st.session_state["door_type"] == "子母门": 
                 st.session_state["mother_door_width"] = st.number_input("母门单扇宽", value=st.session_state["mother_door_width"], step=10)
             elif st.session_state["door_type"] in ["折叠四开门", "两定两开"]: 
@@ -1212,7 +1358,10 @@ def render_main_form(options_mgr):
             st.session_state["fw_top_str"] = c3.text_input("上框宽 (外/内)", value=st.session_state["fw_top_str"])
             
             th_options = ["高低槛", "平底槛"]
-            th_index = th_options.index(st.session_state["threshold_type"]) if st.session_state["threshold_type"] in th_options else 0
+            if st.session_state["threshold_type"] in th_options:
+                th_index = th_options.index(st.session_state["threshold_type"])
+            else:
+                th_index = 0
             st.session_state["threshold_type"] = c4.radio("下槛方案", th_options, horizontal=True, label_visibility="collapsed", index=th_index)
             
             if st.session_state["threshold_type"] == "高低槛": 
@@ -1226,22 +1375,37 @@ def render_main_form(options_mgr):
             hdls = options_mgr.get_all_handles()
             c1, c2 = st.columns(2)
             
-            zm_idx = hdls.index(st.session_state["zmls"]) if st.session_state["zmls"] in hdls else 0
+            if st.session_state["zmls"] in hdls:
+                zm_idx = hdls.index(st.session_state["zmls"])
+            else:
+                zm_idx = 0
             st.session_state["zmls"] = c1.selectbox("正面拉手", hdls, index=zm_idx)
             
-            fm_idx = hdls.index(st.session_state["fmls"]) if st.session_state["fmls"] in hdls else 0
+            if st.session_state["fmls"] in hdls:
+                fm_idx = hdls.index(st.session_state["fmls"])
+            else:
+                fm_idx = 0
             st.session_state["fmls"] = c2.selectbox("反面拉手", hdls, index=fm_idx)
             
             lks = CONFIG.LOCK_OPTIONS.copy()
-            lk_idx = lks.index(st.session_state["st_val"]) if st.session_state["st_val"] in lks else 0
+            if st.session_state["st_val"] in lks:
+                lk_idx = lks.index(st.session_state["st_val"])
+            else:
+                lk_idx = 0
             st.session_state["st_val"] = c1.selectbox("锁体类型", lks, index=lk_idx)
             
             hgs = options_mgr.get_all_hinges()
-            hg_idx = hgs.index(st.session_state["sel_hys"]) if st.session_state["sel_hys"] in hgs else 0
+            if st.session_state["sel_hys"] in hgs:
+                hg_idx = hgs.index(st.session_state["sel_hys"])
+            else:
+                hg_idx = 0
             st.session_state["sel_hys"] = c2.selectbox("合页样式", hgs, index=hg_idx)
             
             hys_opts = ["3个/扇", "2个/扇", "4个/扇", "5个/扇"]
-            hys_idx = hys_opts.index(st.session_state["hysl"]) if st.session_state["hysl"] in hys_opts else 0
+            if st.session_state["hysl"] in hys_opts:
+                hys_idx = hys_opts.index(st.session_state["hysl"])
+            else:
+                hys_idx = 0
             st.session_state["hysl"] = st.selectbox("单扇合页数量", hys_opts, index=hys_idx)
             
         with st.container(border=True):
@@ -1260,12 +1424,18 @@ def render_main_form(options_mgr):
                 
             c6, c7, c8 = st.columns(3)
             qc_opts = ["无", "玻璃", "封闭"]
-            qc_idx = qc_opts.index(st.session_state["sel_qc"]) if st.session_state["sel_qc"] in qc_opts else 0
+            if st.session_state["sel_qc"] in qc_opts:
+                qc_idx = qc_opts.index(st.session_state["sel_qc"])
+            else:
+                qc_idx = 0
             st.session_state["sel_qc"] = c6.selectbox("气窗", qc_opts, index=qc_idx)
             
             st.session_state["has_mm"] = c7.checkbox("门楣", value=st.session_state["has_mm"])
             
-            is_two_fixed = (st.session_state["door_type"] == "两定两开")
+            is_two_fixed = False
+            if st.session_state["door_type"] == "两定两开":
+                is_two_fixed = True
+                
             st.session_state["has_pillar"] = c8.checkbox("立柱", value=st.session_state["has_pillar"], disabled=not is_two_fixed)
             
             c9, c10 = st.columns(2)
@@ -1298,10 +1468,21 @@ def generate_cad_trigger(history_mgr):
     else:
         final_note = current_note
 
-    left_out, left_in = parse_dim_str(st.session_state.get("fw_left_str", "60/60"), 60, 60)
-    right_out, right_in = parse_dim_str(st.session_state.get("fw_right_str", "60/60"), 60, 60)
-    fw_top_out, fw_top_in = parse_dim_str(st.session_state.get("fw_top_str", "60/60"), 60, 60)
-    th_out, th_in = parse_dim_str(st.session_state.get("th_str", "60/60"), 60, 60)
+    parts_left = parse_dim_str(st.session_state.get("fw_left_str", "60/60"), 60, 60)
+    left_out = parts_left[0]
+    left_in = parts_left[1]
+    
+    parts_right = parse_dim_str(st.session_state.get("fw_right_str", "60/60"), 60, 60)
+    right_out = parts_right[0]
+    right_in = parts_right[1]
+    
+    parts_top = parse_dim_str(st.session_state.get("fw_top_str", "60/60"), 60, 60)
+    fw_top_out = parts_top[0]
+    fw_top_in = parts_top[1]
+    
+    parts_th = parse_dim_str(st.session_state.get("th_str", "60/60"), 60, 60)
+    th_out = parts_th[0]
+    th_in = parts_th[1]
 
     if st.session_state["sel_nk"] == "内开":
         lwf = left_in
@@ -1338,7 +1519,9 @@ def generate_cad_trigger(history_mgr):
                 "nk": st.session_state["sel_nk"]
             }
             calc = DimensionCalculator(calc_p)
-            dw, dh = calc.calculate_from_light_size(lw, lh, st.session_state["sel_nk"] == "外开")
+            res_light = calc.calculate_from_light_size(lw, lh, st.session_state["sel_nk"] == "外开")
+            dw = res_light[0]
+            dh = res_light[1]
 
     ttype = st.session_state.get("threshold_type", "高低槛")
     if ttype == "平底槛": 
@@ -1347,14 +1530,32 @@ def generate_cad_trigger(history_mgr):
         pdk_val = st.session_state.get("pdk", "")
     else: 
         parts = st.session_state.get("th_str", "55/70").split("/")
-        dxk_val = parts[0]
-        gxk_val = parts[-1]
+        if len(parts) > 1:
+            dxk_val = parts[0]
+            gxk_val = parts[-1]
+        else:
+            dxk_val = parts[0]
+            gxk_val = parts[0]
         pdk_val = ""
         
     if st.session_state["door_type"] == "两定两开":
         dt_cn = "两定两开门"
     else:
         dt_cn = st.session_state["door_type"]
+        
+    qh_val = ""
+    if st.session_state['qh']:
+        qh_val = f"{st.session_state['qh']} mm"
+        
+    mshd_val = f"{st.session_state['mshd']} mm"
+    
+    qc_height_val = 0
+    if st.session_state["sel_qc"] != "无":
+        qc_height_val = st.session_state["qc_height"]
+        
+    mm_height_val = 0
+    if st.session_state["has_mm"]:
+        mm_height_val = st.session_state["mm_height"]
     
     info_map = {
         "DHDW": st.session_state["dhdw"], 
@@ -1368,8 +1569,8 @@ def generate_cad_trigger(history_mgr):
         "FMLS": st.session_state["fmls"], 
         "ST": st.session_state["st_val"], 
         "HYSL": st.session_state["hysl"], 
-        "QH": f"{st.session_state['qh']} mm" if st.session_state['qh'] else "",
-        "MSHD": f"{st.session_state['mshd']} mm", 
+        "QH": qh_val,
+        "MSHD": mshd_val, 
         "HHXD": st.session_state["hhxd"], 
         "BZ": final_note,
         "DOOR_TYPE": st.session_state["door_type"], 
@@ -1382,12 +1583,72 @@ def generate_cad_trigger(history_mgr):
         "GXK": gxk_val, 
         "PXK": pdk_val, 
         "MX": dt_cn, 
-        "QC_HEIGHT": st.session_state["qc_height"] if st.session_state["sel_qc"] != "无" else 0,
+        "QC_HEIGHT": qc_height_val,
         "HAS_MM": st.session_state["has_mm"], 
-        "MM_HEIGHT": st.session_state["mm_height"] if st.session_state["has_mm"] else 0, 
+        "MM_HEIGHT": mm_height_val, 
         "ZMKS": st.session_state["zmks"], 
         "FMKS": st.session_state["fmks"]
     }
+    
+    out_mark = ""
+    if st.session_state["has_outer"]:
+        out_mark = "√"
+    
+    in_mark = ""
+    if st.session_state["has_inner"]:
+        in_mark = "√"
+        
+    nk_mark = ""
+    if st.session_state["sel_nk"] == "内开":
+        nk_mark = "√"
+        
+    wk_mark = ""
+    if st.session_state["sel_nk"] == "外开":
+        wk_mark = "√"
+        
+    kxr_mark = ""
+    if st.session_state["sel_kx"] == "右开":
+        kxr_mark = "√"
+        
+    kxl_mark = ""
+    if st.session_state["sel_kx"] == "左开":
+        kxl_mark = "√"
+        
+    lz_y = ""
+    lz_n = "√"
+    if st.session_state["has_pillar"]:
+        lz_y = "√"
+        lz_n = ""
+        
+    mm_y = ""
+    mm_n = "√"
+    if st.session_state["has_mm"]:
+        mm_y = "√"
+        mm_n = ""
+        
+    qc_g = ""
+    if st.session_state["sel_qc"] == "玻璃":
+        qc_g = "√"
+        
+    qc_s = ""
+    if st.session_state["sel_qc"] == "封闭":
+        qc_s = "√"
+        
+    bz_q = ""
+    if st.session_state["sel_bz"] == "全包":
+        bz_q = "√"
+        
+    bz_m = ""
+    if st.session_state["sel_bz"] == "木箱":
+        bz_m = "√"
+        
+    gdk_m = ""
+    if st.session_state["threshold_type"] == "高低槛":
+        gdk_m = "√"
+        
+    pdk_m = ""
+    if st.session_state["threshold_type"] == "平底槛":
+        pdk_m = "√"
     
     check_map = {
         "kx": st.session_state["sel_kx"], 
@@ -1397,9 +1658,31 @@ def generate_cad_trigger(history_mgr):
         "bz": st.session_state["sel_bz"], 
         "hys": st.session_state["sel_hys"], 
         "mm": "有" if st.session_state["has_mm"] else "无",
-        "bb": (["外"] if st.session_state["has_outer"] else []) + (["内"] if st.session_state["has_inner"] else []), 
-        "threshold": st.session_state["threshold_type"] 
+        "OUTER": out_mark,
+        "INNER": in_mark,
+        "NK": nk_mark,
+        "WK": wk_mark,
+        "KX_RIGHT": kxr_mark,
+        "KX_LEFT": kxl_mark,
+        "LZ_YES": lz_y,
+        "LZ_NO": lz_n,
+        "MM_YES": mm_y,
+        "MM_NO": mm_n,
+        "QC_GLASS": qc_g,
+        "QC_SEAL": qc_s,
+        "BZ_QB": bz_q,
+        "BZ_MX": bz_m,
+        "GDK": gdk_m,
+        "PDK": pdk_m
     }
+    
+    trim_f = 0
+    if st.session_state["has_outer"]:
+        trim_f = st.session_state["trim_front_in"]
+        
+    trim_b = 0
+    if st.session_state["has_inner"]:
+        trim_b = st.session_state["trim_back_in"]
     
     draw_params = {
         "dw": dw, "dh": dh, 
@@ -1407,15 +1690,19 @@ def generate_cad_trigger(history_mgr):
         "left_width_back": lwb, "right_width_back": rwb, 
         "fw_top_front": ftf, "fw_top_back": ftb, 
         "th_front": thf, "th_back": thb,
-        "trim_front": st.session_state["trim_front_in"] if st.session_state["has_outer"] else 0, 
-        "trim_back": st.session_state["trim_back_in"] if st.session_state["has_inner"] else 0,
-        "overlap": overlap, "door_type": st.session_state["door_type"], 
-        "mother_door_width": st.session_state["mother_door_width"], "mid_door_width": st.session_state["mid_door_width"], 
-        "pillar_width_str": st.session_state["pillar_width_str"], "has_pillar": st.session_state["has_pillar"], 
+        "trim_front": trim_f, 
+        "trim_back": trim_b,
+        "overlap": overlap, 
+        "door_type": st.session_state["door_type"], 
+        "mother_door_width": st.session_state["mother_door_width"], 
+        "mid_door_width": st.session_state["mid_door_width"], 
+        "pillar_width_str": st.session_state["pillar_width_str"], 
+        "has_pillar": st.session_state["has_pillar"], 
         "kx": st.session_state["sel_kx"], "nk": st.session_state["sel_nk"],
-        "qc": st.session_state["sel_qc"], "qc_height": st.session_state["qc_height"] if st.session_state["sel_qc"] != "无" else 0, 
+        "qc": st.session_state["sel_qc"], 
+        "qc_height": qc_height_val, 
         "has_mm": st.session_state["has_mm"], 
-        "mm_height": st.session_state["mm_height"] if st.session_state["has_mm"] else 0, 
+        "mm_height": mm_height_val, 
         "hys": st.session_state["sel_hys"], "hysl": st.session_state["hysl"],
         "left_right_gap": parse_gap_str(st.session_state["left_right_gap_str"], 0), 
         "top_bottom_gap": parse_gap_str(st.session_state["top_bottom_gap_str"], 0), 
@@ -1430,56 +1717,108 @@ def generate_cad_trigger(history_mgr):
     return info_map, check_map, draw_params
 
 
-# ===================== 登录拦截 =====================
+# ===================== 登录拦截与后台 =====================
 def render_login():
-    st.markdown("<h2 style='text-align:center; padding-top:100px;'>🏭 西州将军 - 图纸协同平台</h2>", unsafe_allow_html=True)
-    with st.container():
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            with st.container(border=True):
-                st.markdown("#### 请登录")
-                uid = st.text_input("账号 (如: A, B, C)")
-                pwd = st.text_input("密码", type="password")
-                if st.button("登录", use_container_width=True, type="primary"):
-                    if uid in USERS_DB and USERS_DB[uid]["password"] == pwd:
-                        st.session_state["logged_in"] = True
-                        st.session_state["user_id"] = uid
-                        st.session_state["user_name"] = USERS_DB[uid]["name"]
-                        st.session_state["current_module"] = USERS_DB[uid]["default_module"]
-                        st.rerun()
-                    else:
-                        st.error("账号或密码错误！")
+    st.markdown("<div style='height: 10vh;'></div>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center; color:#1C1C1E; font-weight:700;'>🏭 西州将军 - 智能协同平台</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; color:#8E8E93;'>Sign in to continue</p>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 1.2, 1])
+    with col2:
+        with st.container(border=True):
+            uid = st.text_input("账号")
+            pwd = st.text_input("密码", type="password")
+            
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            if st.button("登 录", use_container_width=True, type="primary"):
+                user_info = user_db.authenticate(uid, pwd)
+                if user_info:
+                    st.session_state["logged_in"] = True
+                    st.session_state["user_id"] = uid
+                    st.session_state["user_name"] = user_info["name"]
+                    st.session_state["user_role"] = user_info["role"]
+                    st.session_state["current_module"] = user_info["default_module"]
+                    st.rerun()
+                else:
+                    st.error("账号或密码错误！")
 
-# ===================== 顶部导航栏 =====================
+def render_admin_dashboard():
+    st.markdown("### ⚙️ 系统后台管理")
+    st.markdown("在这里您可以管理系统内所有员工的账号和权限。")
+    
+    users = user_db.load_all_users()
+    
+    with st.container(border=True):
+        st.markdown("#### 添加/更新账号")
+        c1, c2, c3, c4 = st.columns(4)
+        new_uid = c1.text_input("账号 (用于登录)", placeholder="例: zhangsan")
+        new_name = c2.text_input("姓名", placeholder="例: 销售-张三")
+        new_pwd = c3.text_input("密码", placeholder="设置初始密码")
+        new_role = c4.selectbox("分配角色", ["录入员", "绘图员", "总工", "超级管理员"])
+        
+        if st.button("保存账号", type="primary"):
+            if new_uid and new_name and new_pwd:
+                user_db.add_or_update_user(new_uid, new_pwd, new_role, new_name)
+                st.success(f"✅ 成功保存账号: {new_uid}")
+                st.rerun()
+            else:
+                st.warning("请填写完整账号信息。")
+
+    st.markdown("#### 当前用户列表")
+    for u_id, u_info in users.items():
+        with st.container(border=True):
+            col_info, col_del = st.columns([8, 2])
+            with col_info:
+                st.markdown(f"**{u_info['name']}** (账号: `{u_id}`) | 角色: `{u_info['role']}` | 密码: `{u_info['password']}`")
+            with col_del:
+                if u_id == "admin":
+                    st.markdown("<span style='color:#8E8E93;'>系统内置不可删</span>", unsafe_allow_html=True)
+                else:
+                    if st.button("删除", key=f"del_u_{u_id}"):
+                        user_db.delete_user(u_id)
+                        st.rerun()
+
+
+# ===================== 顶部高级导航栏 =====================
 def render_top_nav():
     st.markdown("<div style='padding-top:10px;'></div>", unsafe_allow_html=True)
-    c1, c2, c3, c_space, c_logout = st.columns([2, 2, 2, 4, 2])
     
-    def nav_button(col, title, module_name):
-        is_active = (st.session_state["current_module"] == module_name)
-        cls = "nav-active" if is_active else "nav-inactive"
-        with col:
-            st.markdown(f'<div class="{cls}">', unsafe_allow_html=True)
-            if st.button(title, use_container_width=True, key=f"nav_{module_name}"):
-                st.session_state["current_module"] = module_name
+    # 动态计算导航列
+    nav_items = [
+        {"title": "📝 图纸信息录入", "module": "图纸信息录入"},
+        {"title": "📐 图纸绘制", "module": "图纸绘制"},
+        {"title": "👁️ 图纸审核", "module": "图纸审核"}
+    ]
+    
+    if st.session_state.get("user_role") == "超级管理员":
+        nav_items.append({"title": "⚙️ 后台管理", "module": "后台管理"})
+        
+    num_navs = len(nav_items)
+    # 分配列比例：前面的导航平分，最后留出一列放退出按钮
+    cols = st.columns([2] * num_navs + [1, 2])
+    
+    for i, item in enumerate(nav_items):
+        is_active = (st.session_state["current_module"] == item["module"])
+        cls_name = "nav-btn-active" if is_active else "nav-btn-inactive"
+        with cols[i]:
+            st.markdown(f'<div class="{cls_name}">', unsafe_allow_html=True)
+            if st.button(item["title"], use_container_width=True, key=f"nav_{item['module']}"):
+                st.session_state["current_module"] = item["module"]
                 st.session_state["active_task_id"] = None
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-    nav_button(c1, "📝 图纸信息录入", "图纸信息录入")
-    nav_button(c2, "📐 图纸绘制", "图纸绘制")
-    nav_button(c3, "👁️ 图纸审核", "图纸审核")
-    
-    with c_logout:
-        st.markdown(f"<div style='text-align:right; color:#86868B; font-size:13px; margin-top:10px;'>👤 {st.session_state['user_name']}</div>", unsafe_allow_html=True)
-        if st.button("退出", use_container_width=True):
+    with cols[-1]:
+        st.markdown(f"<div style='text-align:right; color:#8E8E93; font-size:13px; margin-top:2px;'>{st.session_state['user_name']}</div>", unsafe_allow_html=True)
+        if st.button("退出登录", use_container_width=True):
             st.session_state["logged_in"] = False
             st.rerun()
-    st.divider()
+            
+    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
 # ===================== 主程序 =====================
 def main():
-    st.set_page_config(page_title="西州将军 | 协同系统", layout="wide")
+    st.set_page_config(page_title="西州将军 | 协同平台", layout="wide")
     init_session_state()
     set_custom_style()
 
@@ -1494,8 +1833,15 @@ def main():
 
     current_module = st.session_state.get("current_module")
 
+    # ==================== 模块 0：后台管理 ====================
+    if current_module == "后台管理":
+        if st.session_state.get("user_role") != "超级管理员":
+            st.error("您没有权限访问此页面。")
+        else:
+            render_admin_dashboard()
+
     # ==================== 模块 1：图纸信息录入 ====================
-    if current_module == "图纸信息录入":
+    elif current_module == "图纸信息录入":
         batch_text = st.text_input("✨ 智能文本识别", placeholder="粘贴销售聊天记录，回车自动解析并填充参数...", label_visibility="collapsed")
         if batch_text:
             parsed = parse_batch_text(batch_text)  
@@ -1504,11 +1850,19 @@ def main():
                     st.session_state[k] = v
                 st.rerun()
         
+        st.markdown("#### 🖼️ 客户沟通记录与参考图")
+        ref_img_file = st.file_uploader("上传客户发来的手稿、现场图或聊天截图 (方便后续流转参考)", type=['jpg', 'png', 'jpeg'])
+        ref_img_b64 = None
+        if ref_img_file is not None:
+            ref_img_b64 = base64.b64encode(ref_img_file.getvalue()).decode('utf-8')
+            st.success("参考图已就绪！将随订单一起提交。")
+            
+        st.divider()
         render_main_form(options_mgr)
         
         c1, c2 = st.columns([1, 1])
         with c1:
-            if st.button("📤 提交图纸信息 (转交绘图员)", type="primary", use_container_width=True):
+            if st.button("📤 提交订单 (流转至绘图部)", type="primary", use_container_width=True):
                 task_id = str(uuid.uuid4())[:8]
                 new_task = {
                     "id": task_id, 
@@ -1519,22 +1873,25 @@ def main():
                     "door_type": st.session_state["door_type"],
                     "size": f"{st.session_state['dw']} x {st.session_state['dh']} (洞口)", 
                     "params": get_current_form_data(),
+                    "ref_img_b64": ref_img_b64,
                     "drawing_img_b64": None, 
                     "review_feedback": ""
                 }
                 task_db.add_task(new_task)
-                st.success(f"✅ 任务提交成功！(订单号: {task_id})，请通知绘图员在「图纸绘制」栏查看。")
+                st.success(f"✅ 订单提交成功！(编号: {task_id})，绘图员已可查收。")
         
         with c2:
-            if st.button("⚡ 快速生成CAD (不提交直接下载)", type="secondary", use_container_width=True):
+            if st.button("⚡ 快速生成CAD (仅下载不流转)", type="secondary", use_container_width=True):
                 info_map, check_map, draw_params = generate_cad_trigger(history_mgr)
-                result, buffer = run_integrated_system(info_map, check_map, draw_params, lambda x: None)
+                def prog_cb(m): pass
+                result, buffer = run_integrated_system(info_map, check_map, draw_params, prog_cb)
                 if buffer: 
                     st.download_button("⬇️ 点击下载 DXF", data=buffer.getvalue(), file_name=f"排版图纸_{st.session_state['dhdw']}.dxf", mime="application/dxf", use_container_width=True)
 
     # ==================== 模块 2：图纸绘制 ====================
     elif current_module == "图纸绘制":
         active_id = st.session_state.get("active_task_id")
+        
         if active_id:
             active_task = task_db.get_task(active_id)
             if not active_task:
@@ -1542,11 +1899,22 @@ def main():
                 st.session_state["active_task_id"] = None
                 st.rerun()
                 
-            if st.button("← 返回任务列表", type="secondary"):
-                st.session_state["active_task_id"] = None
-                st.rerun()
+            c_back, c_title = st.columns([1, 9])
+            with c_back:
+                if st.button("← 返回列表"):
+                    st.session_state["active_task_id"] = None
+                    st.rerun()
+            with c_title:
+                st.markdown(f"<h4 style='margin-bottom:0;'>正在处理：{active_task['customer']} - {active_task['project']} {get_status_badge(active_task['status'])}</h4>", unsafe_allow_html=True)
                 
-            st.markdown(f"#### 正在处理：{active_task['customer']} - {active_task['project']} {get_status_badge(active_task['status'])}", unsafe_allow_html=True)
+            if active_task.get("ref_img_b64"):
+                with st.expander("🖼️ 查看前端销售上传的参考图 / 沟通记录"):
+                    try:
+                        ref_bytes = base64.b64decode(active_task["ref_img_b64"])
+                        st.image(ref_bytes, use_column_width=True)
+                    except Exception:
+                        pass
+                
             if active_task['status'] == "待修改" and active_task['review_feedback']: 
                 st.error(f"🛑 审核驳回意见：\n\n{active_task['review_feedback']}")
 
@@ -1556,12 +1924,13 @@ def main():
             with c_gen:
                 if st.button("⚡ 生成基准 CAD 底图", type="secondary", use_container_width=True):
                     info_map, check_map, draw_params = generate_cad_trigger(history_mgr)
-                    result, buffer = run_integrated_system(info_map, check_map, draw_params, lambda x: None)
+                    def prog_cb(m): pass
+                    result, buffer = run_integrated_system(info_map, check_map, draw_params, prog_cb)
                     if buffer: 
-                        st.download_button("⬇️ 下载 DXF 进行微调", data=buffer.getvalue(), file_name=f"基准图纸_{active_task['id']}.dxf", mime="application/dxf", use_container_width=True)
+                        st.download_button("⬇️ 下载 DXF 进行深化", data=buffer.getvalue(), file_name=f"基准图纸_{active_task['id']}.dxf", mime="application/dxf", use_container_width=True)
             
             with c_upload:
-                uploaded_file = st.file_uploader("📥 上传深化完成的图纸 (支持 JPG/PNG 等用于审核)", label_visibility="collapsed")
+                uploaded_file = st.file_uploader("📥 上传深化完成的图纸图片 (JPG/PNG)，提交给总工审核", label_visibility="collapsed")
                 if st.button("📤 提交审核", type="primary", use_container_width=True):
                     if uploaded_file is not None:
                         img_b64 = base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
@@ -1571,7 +1940,7 @@ def main():
                             "params": get_current_form_data()
                         })
                         st.session_state["active_task_id"] = None
-                        st.success("提交成功！")
+                        st.success("成功提交给总工！")
                         st.rerun()
                     else: 
                         st.warning("请先上传图纸文件！")
@@ -1591,27 +1960,22 @@ def main():
             else:
                 for task in tasks_to_show:
                     with st.container():
-                        st.markdown(f"""
-                        <div class="task-card">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <div>
-                                    <div class="task-title">{task['customer']} - {task['project']}</div>
-                                    <div class="task-sub">门型：{task['door_type']} | 尺寸：{task['size']} | 日期：{task['date']}</div>
-                                </div>
-                                <div>{get_status_badge(task['status'])}</div>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        c_edit, c_del, _ = st.columns([2, 2, 8])
-                        with c_edit:
-                            if st.button(f"✏️ 调出深化面板", key=f"btn_{task['id']}", use_container_width=True):
+                        col_card, col_del = st.columns([9.2, 0.8])
+                        with col_card:
+                            # 伪装成卡片的按钮
+                            st.markdown('<div class="drawing-card-btn">', unsafe_allow_html=True)
+                            btn_text = f"📂 {task['customer']} - {task['project']} \n\n 门型：{task['door_type']} | 洞口：{task['size']} | 状态：{task['status']}"
+                            if st.button(btn_text, key=f"btn_{task['id']}", use_container_width=True):
                                 load_task_to_session(task)
                                 st.session_state["active_task_id"] = task["id"]
                                 st.rerun()
-                        with c_del:
-                            if st.button(f"🗑️ 删除", key=f"del_{task['id']}", use_container_width=True):
+                            st.markdown('</div>', unsafe_allow_html=True)
+                        with col_del:
+                            st.markdown('<div class="delete-btn">', unsafe_allow_html=True)
+                            if st.button("🗑️", key=f"del_{task['id']}", use_container_width=True, help="删除此订单"):
                                 task_db.delete_task(task['id'])
                                 st.rerun()
+                            st.markdown('</div>', unsafe_allow_html=True)
 
     # ==================== 模块 3：图纸审核 ====================
     elif current_module == "图纸审核":
@@ -1630,25 +1994,35 @@ def main():
             c_img, c_info = st.columns([6, 4])
             with c_img:
                 st.markdown("#### 图纸预览")
+                st.caption("🔍 提示：将鼠标悬浮在图片上，点击右上角的无损展开图标 [ ⤢ ] 即可全屏放大审查。")
                 if active_task.get("drawing_img_b64"):
                     try:
                         img_bytes = base64.b64decode(active_task["drawing_img_b64"])
                         st.image(img_bytes, use_column_width=True)
                     except Exception: 
-                        st.info("上传的文件格式不支持图片预览，请下载查看。")
+                        st.info("图片解析失败。")
                 else: 
                     st.warning("绘图员未上传预览图。")
+                    
+                if active_task.get("ref_img_b64"):
+                    with st.expander("🖼️ 查看前端录入的原单/参考图"):
+                        try:
+                            ref_bytes = base64.b64decode(active_task["ref_img_b64"])
+                            st.image(ref_bytes, use_column_width=True)
+                        except Exception:
+                            pass
             
             with c_info:
                 st.markdown("#### 核心参数核对")
                 p = active_task["params"]
-                st.write(f"**客户:** {p.get('dhdw')} | **项目:** {p.get('gdmc')}")
-                st.write(f"**门型:** {p.get('door_type')} | **洞口:** {p.get('dw')}x{p.get('dh')}")
-                st.write(f"**开向:** {p.get('sel_kx')}{p.get('sel_nk')}")
-                st.write(f"**材质:** {p.get('zzcl')} | **颜色:** {p.get('ys')}")
+                with st.container(border=True):
+                    st.write(f"**客户:** {p.get('dhdw')} | **项目:** {p.get('gdmc')}")
+                    st.write(f"**门型:** {p.get('door_type')} | **洞口:** {p.get('dw')}x{p.get('dh')}")
+                    st.write(f"**开向:** {p.get('sel_kx')}{p.get('sel_nk')}")
+                    st.write(f"**材质:** {p.get('zzcl')} | **颜色:** {p.get('ys')}")
                 
                 st.markdown("#### 审核意见")
-                feedback = st.text_area("输入修改意见", value=active_task["review_feedback"], height=100)
+                feedback = st.text_area("输入修改要求", value=active_task["review_feedback"], height=120, placeholder="如：右侧压框尺寸不对，请改成 30mm...")
                 
                 cb1, cb2 = st.columns(2)
                 with cb1:
@@ -1673,21 +2047,16 @@ def main():
             else:
                 for task in review_tasks:
                     with st.container():
-                        st.markdown(f"""
-                        <div class="task-card">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <div>
-                                    <div class="task-title">{task['customer']} - {task['project']}</div>
-                                    <div class="task-sub">门型：{task['door_type']} | 提交时间：{task['date']}</div>
-                                </div>
-                                <div>{get_status_badge(task['status'])}</div>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        if task['status'] == "待审核":
-                            if st.button(f"开始审核", key=f"rev_{task['id']}"):
+                        col_card, col_action = st.columns([8.5, 1.5])
+                        with col_card:
+                            st.markdown('<div class="drawing-card-btn">', unsafe_allow_html=True)
+                            btn_txt = f"🔍 {task['customer']} - {task['project']} \n\n 提交时间：{task['date']} | 状态：{task['status']}"
+                            if st.button(btn_txt, key=f"rev_{task['id']}", use_container_width=True):
                                 st.session_state["active_task_id"] = task["id"]
                                 st.rerun()
+                            st.markdown('</div>', unsafe_allow_html=True)
+                        with col_action:
+                            pass # 留空或放置快捷通过按钮
 
 if __name__ == "__main__":
     main()
