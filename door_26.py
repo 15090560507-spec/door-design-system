@@ -1,8 +1,8 @@
 """
-西州将军铜门 - 生产图纸协同系统 (Pro ERP 架构版 - 语法安全修复版)
-- 包含模块：[图纸信息录入]、[图纸绘制]、[图纸审核]
-- 支持状态流转：录入 -> 待绘制 -> 待审核 -> 待修改/已通过
-- 极致保留 iOS/Apple 风格 UI 与全套 ezdxf 自动出图内核。
+西州将军铜门 - 生产图纸协同系统 (Multi-User 持久化协同版)
+- 核心升级：废弃易失性 Session State 数据库，全面切换为持久化 JSON 文件数据库。
+- 协同支持：支持 A(录入) -> B(绘制) -> C(审核) 跨电脑、跨设备实时协同流转。
+- 数据安全：所有订单数据、图纸审核状态永久保存至本地/云端硬盘。
 - [修复]：彻底移除了所有用于压缩代码的违规分号，恢复标准 Python 缩进。
 """
 import sys
@@ -15,9 +15,11 @@ import datetime
 import math
 import re
 import json
+import base64
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, field
 
+# ===================== 环境与路径配置 =====================
 # 兼容 PyInstaller 打包后的路径
 if getattr(sys, 'frozen', False):
     base_path = sys._MEIPASS
@@ -27,9 +29,10 @@ else:
 DATA_DIR = os.path.join(base_path, 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# ===================== 数据文件路径 =====================
+# 定义持久化数据库文件路径
 HISTORY_FILE = os.path.join(DATA_DIR, 'order_history.json')
 CUSTOM_OPTIONS_FILE = os.path.join(DATA_DIR, 'custom_options.json')
+TASKS_DB_FILE = os.path.join(DATA_DIR, 'tasks_database.json') # 【核心新增】真实持久化任务数据库
 
 # ===================== 核心配置 =====================
 @dataclass
@@ -54,7 +57,59 @@ class Config:
 
 CONFIG = Config()
 
-# ===================== 管理类 =====================
+# ===================== 持久化数据库管理类 (核心引擎升级) =====================
+
+class TaskDatabaseManager:
+    """任务持久化管理引擎：保证所有设备读写同一份文件，实现协同"""
+    def __init__(self, file_path):
+        self.file_path = file_path
+        if not os.path.exists(self.file_path):
+            self.save([]) # 初始化为空列表
+
+    def load_all_tasks(self) -> List[Dict]:
+        """读取所有任务"""
+        try:
+            with open(self.file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            st.error(f"读取数据库失败: {e}")
+            return []
+
+    def save(self, tasks: List[Dict]):
+        """覆盖保存所有任务"""
+        try:
+            with open(self.file_path, 'w', encoding='utf-8') as f:
+                json.dump(tasks, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            st.error(f"写入数据库失败: {e}")
+
+    def add_task(self, new_task: Dict):
+        """新增任务（自动插入到最前面）"""
+        tasks = self.load_all_tasks()
+        tasks.insert(0, new_task)
+        self.save(tasks)
+
+    def update_task(self, task_id: str, updated_data: Dict):
+        """局部更新任务（用于状态流转、参数修改、上传图纸）"""
+        tasks = self.load_all_tasks()
+        for i, task in enumerate(tasks):
+            if task["id"] == task_id:
+                tasks[i].update(updated_data)
+                break
+        self.save(tasks)
+        
+    def get_task(self, task_id: str) -> Optional[Dict]:
+        """获取单个任务详情"""
+        tasks = self.load_all_tasks()
+        for task in tasks:
+            if task["id"] == task_id:
+                return task
+        return None
+
+# 实例化全局任务数据库
+task_db = TaskDatabaseManager(TASKS_DB_FILE)
+
+
 class HistoryManager:
     def __init__(self, file_path):
         self.file_path = file_path
@@ -137,6 +192,7 @@ class CustomOptionsManager:
     def get_all_hinges(self):
         custom = self.load().get("hinges", [])
         return list(dict.fromkeys(custom + list(CONFIG.HINGE_TYPES.keys())))
+
 
 # ===================== 尺寸计算核心 =====================
 class DimensionCalculator:
@@ -931,7 +987,6 @@ def run_integrated_system(info: Dict, checks: Dict, draw_p: Dict, progress_callb
         import traceback
         return f"生成出错: {str(e)}\n{traceback.format_exc()}", None
 
-
 # ===================== UI 深度重构与工作流 (Apple/iOS 风格) =====================
 def set_custom_style():
     st.markdown("""
@@ -990,11 +1045,7 @@ def set_custom_style():
     </style>
     """, unsafe_allow_html=True)
 
-# ----------------- 数据库与状态初始化 -----------------
 def init_session_state():
-    if "db_tasks" not in st.session_state:
-        st.session_state["db_tasks"] = []
-    
     if "current_module" not in st.session_state:
         st.session_state["current_module"] = "图纸信息录入"
         
@@ -1298,10 +1349,10 @@ def main():
                     "door_type": st.session_state["door_type"],
                     "size": f"{st.session_state['dw']} x {st.session_state['dh']} (洞口)",
                     "params": get_current_form_data(),
-                    "drawing_img": None,
+                    "drawing_img_b64": None, # 保存图片的base64编码用于持久化
                     "review_feedback": ""
                 }
-                st.session_state["db_tasks"].insert(0, new_task)
+                task_db.add_task(new_task)
                 st.success(f"✅ 任务提交成功！(订单号: {task_id})，请通知绘图员在「图纸绘制」栏查看。")
         
         with c2:
@@ -1316,44 +1367,53 @@ def main():
         st.markdown("### 📐 第二步：图纸绘制与深化")
         
         if st.session_state["active_task_id"]:
-            active_task = next((t for t in st.session_state["db_tasks"] if t["id"] == st.session_state["active_task_id"]), None)
+            active_task = task_db.get_task(st.session_state["active_task_id"])
+            if not active_task:
+                st.error("任务不存在")
+                st.session_state["active_task_id"] = None
+                st.rerun()
+                
             if st.button("← 返回任务列表", type="secondary"):
                 st.session_state["active_task_id"] = None
                 st.rerun()
                 
-            if active_task:
-                st.markdown(f"#### 正在处理：{active_task['customer']} - {active_task['project']} {get_status_badge(active_task['status'])}", unsafe_allow_html=True)
-                
-                if active_task['status'] == "待修改" and active_task['review_feedback']:
-                    st.error(f"🛑 审核驳回意见：\n\n{active_task['review_feedback']}")
+            st.markdown(f"#### 正在处理：{active_task['customer']} - {active_task['project']} {get_status_badge(active_task['status'])}", unsafe_allow_html=True)
+            
+            if active_task['status'] == "待修改" and active_task['review_feedback']:
+                st.error(f"🛑 审核驳回意见：\n\n{active_task['review_feedback']}")
 
-                render_main_form(options_mgr)
-                
-                c_gen, c_upload = st.columns([1, 1])
-                with c_gen:
-                    if st.button("⚡ 生成基准 CAD 底图", type="secondary", use_container_width=True):
-                        info_map, check_map, draw_params = generate_cad_trigger(history_mgr)
-                        result, buffer = run_integrated_system(info_map, check_map, draw_params, lambda x: None)
-                        if buffer: 
-                            st.download_button("⬇️ 下载 DXF 进行微调", data=buffer.getvalue(), file_name=f"基准图纸_{active_task['id']}.dxf", mime="application/dxf", use_container_width=True)
-                
-                with c_upload:
-                    uploaded_file = st.file_uploader("📥 上传深化完成的图纸 (支持 JPG/PNG 等用于审核)", label_visibility="collapsed")
-                    if st.button("提交审核", type="primary", use_container_width=True):
-                        if uploaded_file is not None:
-                            active_task["drawing_img"] = uploaded_file.getvalue()
-                            active_task["status"] = "待审核"
-                            active_task["params"] = get_current_form_data()
-                            st.session_state["active_task_id"] = None
-                            st.rerun()
-                        else:
-                            st.warning("请先上传图纸文件！")
+            render_main_form(options_mgr)
+            
+            c_gen, c_upload = st.columns([1, 1])
+            with c_gen:
+                if st.button("⚡ 生成基准 CAD 底图", type="secondary", use_container_width=True):
+                    info_map, check_map, draw_params = generate_cad_trigger(history_mgr)
+                    result, buffer = run_integrated_system(info_map, check_map, draw_params, lambda x: None)
+                    if buffer: 
+                        st.download_button("⬇️ 下载 DXF 进行微调", data=buffer.getvalue(), file_name=f"基准图纸_{active_task['id']}.dxf", mime="application/dxf", use_container_width=True)
+            
+            with c_upload:
+                uploaded_file = st.file_uploader("📥 上传深化完成的图纸 (支持 JPG/PNG 等用于审核)", label_visibility="collapsed")
+                if st.button("提交审核", type="primary", use_container_width=True):
+                    if uploaded_file is not None:
+                        img_b64 = base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
+                        task_db.update_task(active_task["id"], {
+                            "drawing_img_b64": img_b64,
+                            "status": "待审核",
+                            "params": get_current_form_data()
+                        })
+                        st.session_state["active_task_id"] = None
+                        st.success("提交成功！")
+                        st.rerun()
+                    else:
+                        st.warning("请先上传图纸文件！")
                             
         else:
             filter_date = st.date_input("检索日期", value=datetime.date.today())
             filter_date_str = filter_date.strftime("%Y.%m.%d")
             
-            tasks_to_show = [t for t in st.session_state["db_tasks"] if t["date"] == filter_date_str]
+            all_tasks = task_db.load_all_tasks()
+            tasks_to_show = [t for t in all_tasks if t["date"] == filter_date_str]
             
             if not tasks_to_show:
                 st.info("🎉 暂无待处理任务！")
@@ -1381,49 +1441,59 @@ def main():
         st.markdown("### 👁️ 第三步：总工审核")
         
         if st.session_state["active_task_id"]:
-            active_task = next((t for t in st.session_state["db_tasks"] if t["id"] == st.session_state["active_task_id"]), None)
+            active_task = task_db.get_task(st.session_state["active_task_id"])
+            if not active_task:
+                st.error("任务不存在")
+                st.session_state["active_task_id"] = None
+                st.rerun()
+                
             if st.button("← 返回待审列表", type="secondary"):
                 st.session_state["active_task_id"] = None
                 st.rerun()
                 
-            if active_task:
-                c_img, c_info = st.columns([6, 4])
-                with c_img:
-                    st.markdown("#### 图纸预览")
-                    if active_task["drawing_img"]:
-                        try:
-                            st.image(active_task["drawing_img"], use_column_width=True)
-                        except:
-                            st.info("上传的文件格式不支持图片预览，请下载查看。")
-                    else:
-                        st.warning("绘图员未上传预览图。")
+            c_img, c_info = st.columns([6, 4])
+            with c_img:
+                st.markdown("#### 图纸预览")
+                if active_task.get("drawing_img_b64"):
+                    try:
+                        img_bytes = base64.b64decode(active_task["drawing_img_b64"])
+                        st.image(img_bytes, use_column_width=True)
+                    except:
+                        st.info("上传的文件格式不支持图片预览，请下载查看。")
+                else:
+                    st.warning("绘图员未上传预览图。")
+            
+            with c_info:
+                st.markdown("#### 核心参数核对")
+                p = active_task["params"]
+                st.write(f"**客户:** {p.get('dhdw')} | **项目:** {p.get('gdmc')}")
+                st.write(f"**门型:** {p.get('door_type')} | **洞口:** {p.get('dw')}x{p.get('dh')}")
+                st.write(f"**开向:** {p.get('sel_kx')}{p.get('sel_nk')}")
+                st.write(f"**材质:** {p.get('zzcl')} | **颜色:** {p.get('ys')}")
                 
-                with c_info:
-                    st.markdown("#### 核心参数核对")
-                    p = active_task["params"]
-                    st.write(f"**客户:** {p.get('dhdw')} | **项目:** {p.get('gdmc')}")
-                    st.write(f"**门型:** {p.get('door_type')} | **洞口:** {p.get('dw')}x{p.get('dh')}")
-                    st.write(f"**开向:** {p.get('sel_kx')}{p.get('sel_nk')}")
-                    st.write(f"**材质:** {p.get('zzcl')} | **颜色:** {p.get('ys')}")
-                    
-                    st.markdown("#### 审核意见")
-                    feedback = st.text_area("输入修改意见", value=active_task["review_feedback"], height=100)
-                    
-                    cb1, cb2 = st.columns(2)
-                    with cb1:
-                        if st.button("❌ 打回修改", type="secondary", use_container_width=True):
-                            active_task["status"] = "待修改"
-                            active_task["review_feedback"] = feedback
-                            st.session_state["active_task_id"] = None
-                            st.rerun()
-                    with cb2:
-                        if st.button("✅ 审核通过", type="primary", use_container_width=True):
-                            active_task["status"] = "已通过"
-                            active_task["review_feedback"] = "通过"
-                            st.session_state["active_task_id"] = None
-                            st.rerun()
+                st.markdown("#### 审核意见")
+                feedback = st.text_area("输入修改意见", value=active_task["review_feedback"], height=100)
+                
+                cb1, cb2 = st.columns(2)
+                with cb1:
+                    if st.button("❌ 打回修改", type="secondary", use_container_width=True):
+                        task_db.update_task(active_task["id"], {
+                            "status": "待修改",
+                            "review_feedback": feedback
+                        })
+                        st.session_state["active_task_id"] = None
+                        st.rerun()
+                with cb2:
+                    if st.button("✅ 审核通过", type="primary", use_container_width=True):
+                        task_db.update_task(active_task["id"], {
+                            "status": "已通过",
+                            "review_feedback": "通过"
+                        })
+                        st.session_state["active_task_id"] = None
+                        st.rerun()
         else:
-            review_tasks = [t for t in st.session_state["db_tasks"] if t["status"] in ["待审核", "已通过"]]
+            all_tasks = task_db.load_all_tasks()
+            review_tasks = [t for t in all_tasks if t["status"] in ["待审核", "已通过"]]
             if not review_tasks:
                 st.info("✅ 目前没有需要审核的图纸。")
             else:
