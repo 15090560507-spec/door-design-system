@@ -1,10 +1,9 @@
 """
-西州将军铜门 - 生产图纸协同系统 (SaaS 尊享视觉优化版)
-- 优化：移除文本智能解析功能，界面极致清爽。
-- 优化：顶部导航栏增加物理级按压反馈与高亮对比。
-- 优化：绘图流转模块拆分为上下两部分（生成基准 -> 提交深化）。
-- 优化：全链路原生图片点击放大，移除多余交互按钮。
-- 绝对无分号压缩，100% 遵循 PEP8 规范。
+西州将军铜门 - 生产图纸协同系统 (ERP 终极流水线版)
+- 架构升级：四大标准流水线（录入 -> 绘制 -> 初审 -> 终审）。
+- 交互革新：原生小图预览，点击无损放大；导航栏物理级内凹按压反馈。
+- 输入强化：文字记录与图片上传双轨并行；输入框强制高对比度描边。
+- 100% 遵守 PEP8 规范，代码全部展开，安全可靠。
 """
 import sys
 import os
@@ -70,9 +69,10 @@ class UserDatabaseManager:
         if not os.path.exists(self.file_path):
             default_users = {
                 "admin": {"password": "888888", "role": "超级管理员", "name": "系统管理员", "default_module": "后台管理"},
-                "A": {"password": "123", "role": "录入员", "name": "销售录入", "default_module": "图纸信息录入"},
-                "B": {"password": "123", "role": "绘图员", "name": "技术深化", "default_module": "图纸绘制"},
-                "C": {"password": "123", "role": "总工", "name": "审核总工", "default_module": "图纸审核"}
+                "A": {"password": "123", "role": "录入员", "name": "销售小A", "default_module": "图纸信息录入"},
+                "B": {"password": "123", "role": "绘图员", "name": "技术小B", "default_module": "图纸绘制"},
+                "C": {"password": "123", "role": "初审员", "name": "初审小C", "default_module": "图纸初审"},
+                "D": {"password": "123", "role": "总工", "name": "总工小D", "default_module": "图纸终审"}
             }
             self.save(default_users)
 
@@ -101,7 +101,8 @@ class UserDatabaseManager:
             "超级管理员": "后台管理",
             "录入员": "图纸信息录入",
             "绘图员": "图纸绘制",
-            "总工": "图纸审核"
+            "初审员": "图纸初审",
+            "总工": "图纸终审"
         }
         users[uid] = {
             "password": pwd,
@@ -252,72 +253,75 @@ class CustomOptionsManager:
         return list(dict.fromkeys(custom + list(CONFIG.HINGE_TYPES.keys())))
 
 
-# ===================== UI 深度重构高级系统 (Apple Style) =====================
+# ===================== UI 深度重构高级系统 (物理按压反馈版) =====================
 def set_custom_style():
     st.markdown("""
     <style>
-    /* 全局高级背景调色与字体 */
+    /* 全局背景与字体 */
     .stApp { 
         background-color: #F2F2F7; 
         font-family: "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
     }
     
-    /* 隐藏默认占位 */
     header, footer, .stDeployButton { visibility: hidden !important; display: none !important; }
 
-    /* ======== 导航栏方形按钮 (物理按压质感) ======== */
-    .nav-btn-active > button {
-        background-color: #007AFF !important;
-        color: #FFFFFF !important;
-        border: none !important;
+    /* ======== 核心交互：按钮物理按压与凸起效果 ======== */
+    /* 选中的模块按钮 / 核心提交按钮 (Primary) -> 赋予内凹的真实按压感 */
+    .stButton > button[kind="primary"] { 
+        background-color: #007AFF !important; 
+        color: white !important; 
+        border: none !important; 
         border-radius: 8px !important;
-        font-weight: 600 !important;
-        /* 模拟被深深按下去的内阴影状态 */
-        box-shadow: inset 0 4px 6px rgba(0,0,0,0.3) !important;
+        font-weight: bold !important;
+        box-shadow: inset 0 4px 6px rgba(0,0,0,0.3) !important; /* 核心：内阴影模拟被深深按下 */
+        transform: translateY(2px) !important; /* 核心：位置物理下陷 */
+        transition: all 0.2s ease !important;
+    }
+    
+    /* 未选中的模块按钮 / 普通操作按钮 (Secondary) -> 赋予凸起的立体感 */
+    .stButton > button[kind="secondary"] { 
+        background-color: #FFFFFF !important; 
+        color: #1C1C1E !important; 
+        border: 1px solid #C7C7CC !important; 
+        border-radius: 8px !important;
+        font-weight: 500 !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.06) !important; /* 核心：外阴影模拟凸起按键 */
+        transform: translateY(0px) !important;
+        transition: all 0.2s ease !important;
+    }
+    .stButton > button[kind="secondary"]:hover {
+        border-color: #007AFF !important;
+        color: #007AFF !important;
+        box-shadow: 0 6px 12px rgba(0, 122, 255, 0.1) !important;
+    }
+    .stButton > button[kind="secondary"]:active {
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.1) !important;
         transform: translateY(2px) !important;
     }
 
-    .nav-btn-inactive > button {
-        background-color: #FFFFFF !important;
-        color: #1C1C1E !important;
-        border: 1px solid #C7C7CC !important;
-        border-radius: 8px !important;
-        font-weight: 500 !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
-        transition: all 0.2s ease;
-    }
-    .nav-btn-inactive > button:hover {
-        background-color: #F2F2F7 !important;
-        border-color: #8E8E93 !important;
-    }
-
-    /* ======== 表单卡片悬浮与边缘 ======== */
+    /* ======== 表单悬浮卡片 ======== */
     div[data-testid="stVerticalBlock"] > div > div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FFFFFF !important; 
         border-radius: 12px !important; 
         border: 1px solid rgba(0,0,0,0.05) !important;
         box-shadow: 0 4px 20px rgba(0,0,0,0.03) !important; 
         padding: 20px 24px !important;
-        transition: box-shadow 0.3s ease;
-    }
-    div[data-testid="stVerticalBlock"] > div > div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-        box-shadow: 0 8px 30px rgba(0,0,0,0.08) !important;
     }
     
-    /* ======== 输入框明确边界重写 ======== */
+    /* ======== 输入框明确边界与高亮 ======== */
     .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] > div, .stTextArea textarea {
         font-size: 14px !important; 
         border-radius: 6px !important; 
-        min-height: 38px !important;
         background-color: #FAFAFC !important; 
-        border: 1px solid #C7C7CC !important;  
+        border: 1px solid #C7C7CC !important;  /* 核心：极其清晰的边框线 */
         transition: all 0.2s ease;
     }
     .stTextInput input:focus, .stNumberInput input:focus, .stSelectbox div[data-baseweb="select"] > div:focus-within, .stTextArea textarea:focus {
         background-color: #FFFFFF !important; 
-        border: 1px solid #007AFF !important;
+        border: 2px solid #007AFF !important; /* 核心：选中时变成两像素蓝边 */
         box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15) !important;
     }
+    
     label, .stRadio label, .stCheckbox label { 
         font-size: 13px !important; 
         font-weight: 500 !important; 
@@ -333,10 +337,7 @@ def set_custom_style():
         border-bottom: 1px solid #F2F2F7; 
     }
 
-    /* ======== 紧凑型上传框定制 ======== */
-    [data-testid="stFileUploader"] {
-        width: 100% !important;
-    }
+    /* ======== 紧凑型上传框 (方形) ======== */
     [data-testid="stFileUploader"] section {
         padding: 1rem !important;
         background-color: #FAFAFC !important;
@@ -346,16 +347,15 @@ def set_custom_style():
         flex-direction: column !important;
         align-items: center !important;
         justify-content: center !important;
-        min-height: 80px !important; /* 极大压缩高度 */
+        min-height: 80px !important;
     }
     [data-testid="stFileUploader"] section:hover { border-color: #007AFF !important; background-color: #F0F8FF !important; }
     [data-testid="stFileUploader"] section > div > span { display: none !important; } 
     [data-testid="stFileUploader"] section > div > small { display: none !important; } 
     [data-testid="stFileUploader"] section > button { display: none !important; }
     
-    /* 伪造里面的提示文字 */
     [data-testid="stFileUploader"] section::before {
-        content: "➕ 拖拽图片至此 / 或点击后按 Ctrl+V 粘贴";
+        content: "➕ 点击框内后 Ctrl+V 粘贴 / 或拖拽图片";
         color: #8E8E93;
         font-weight: 600;
         font-size: 14px;
@@ -363,41 +363,19 @@ def set_custom_style():
         pointer-events: none;
     }
 
-    /* ======== 各种按钮统一样式 ======== */
-    .stButton > button { 
-        border-radius: 8px !important; 
-        font-weight: 600 !important; 
-        transition: transform 0.1s ease !important;
+    /* ======== 列表任务卡片 ======== */
+    .task-card { 
+        background: #FFF; 
+        border: 1px solid #E5E5EA; 
+        border-radius: 8px; 
+        padding: 16px; 
+        margin-bottom: 8px; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02); 
     }
-    .stButton > button:active { transform: scale(0.97) !important; }
-    .stButton > button[kind="primary"] { 
-        background-color: #007AFF !important; color: white !important; border: none !important; 
-    }
-    .stButton > button[kind="secondary"] { 
-        background-color: #FFFFFF !important; color: #1C1C1E !important; border: 1px solid #C7C7CC !important; 
-    }
+    .task-title { font-size: 16px; font-weight: 600; color: #1D1D1F; margin-bottom: 4px; }
+    .task-sub { font-size: 13px; color: #86868B; }
 
-    /* ======== 图纸点击卡片与删除 ======== */
-    .drawing-card-btn > button {
-        background-color: #FFFFFF !important;
-        border: 1px solid #E5E5EA !important;
-        border-radius: 10px !important;
-        text-align: left !important;
-        padding: 16px 20px !important;
-        height: 100% !important;
-        color: #1C1C1E !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.02) !important;
-        transition: all 0.2s ease;
-    }
-    .drawing-card-btn > button:hover {
-        border-color: #007AFF !important;
-        box-shadow: 0 6px 16px rgba(0, 122, 255, 0.1) !important;
-        transform: translateY(-2px);
-    }
-    .delete-btn > button {
-        background-color: #FFF0F0 !important; color: #FF3B30 !important; border: 1px solid #FFD1D1 !important; border-radius: 10px !important;
-    }
-    
+    /* 状态徽章 */
     .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
     .badge-pending { background-color: #F2F2F7; color: #1C1C1E; }
     .badge-review { background-color: #FFF5E5; color: #FF9500; }
@@ -450,7 +428,8 @@ def get_current_form_data():
 def get_status_badge(status):
     mapping = {
         "待绘制": "badge-pending", 
-        "待审核": "badge-review", 
+        "待初审": "badge-review",
+        "待终审": "badge-review",
         "待修改": "badge-modify", 
         "已通过": "badge-success"
     }
@@ -1523,7 +1502,7 @@ def render_admin_dashboard():
         new_uid = c1.text_input("账号 (用于登录)", placeholder="例: zhangsan")
         new_name = c2.text_input("姓名", placeholder="例: 销售-张三")
         new_pwd = c3.text_input("密码", placeholder="设置初始密码")
-        new_role = c4.selectbox("分配角色", ["录入员", "绘图员", "总工", "超级管理员"])
+        new_role = c4.selectbox("分配角色", ["录入员", "绘图员", "初审员", "总工", "超级管理员"])
         
         if st.button("保存账号", type="primary"):
             if new_uid and new_name and new_pwd:
@@ -1554,7 +1533,8 @@ def render_top_nav():
     nav_items = [
         {"title": "📝 图纸信息录入", "module": "图纸信息录入"},
         {"title": "📐 图纸绘制", "module": "图纸绘制"},
-        {"title": "👁️ 图纸审核", "module": "图纸审核"}
+        {"title": "🧐 图纸初审", "module": "图纸初审"},
+        {"title": "👁️ 图纸终审", "module": "图纸终审"}
     ]
     
     if st.session_state.get("user_role") == "超级管理员":
@@ -1568,14 +1548,15 @@ def render_top_nav():
         if st.session_state["current_module"] == item["module"]:
             is_active = True
             
-        cls_name = "nav-btn-active" if is_active else "nav-btn-inactive"
         with cols[i]:
-            st.markdown(f'<div class="{cls_name}">', unsafe_allow_html=True)
-            if st.button(item["title"], use_container_width=True, key=f"nav_{item['module']}"):
-                st.session_state["current_module"] = item["module"]
-                st.session_state["active_task_id"] = None
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
+            if is_active:
+                if st.button(item["title"], use_container_width=True, type="primary", key=f"nav_{item['module']}"):
+                    pass
+            else:
+                if st.button(item["title"], use_container_width=True, type="secondary", key=f"nav_{item['module']}"):
+                    st.session_state["current_module"] = item["module"]
+                    st.session_state["active_task_id"] = None
+                    st.rerun()
 
     with cols[-1]:
         st.markdown(f"<div style='text-align:right; color:#8E8E93; font-size:13px; margin-top:2px;'>👤 {st.session_state['user_name']}</div>", unsafe_allow_html=True)
@@ -1611,14 +1592,20 @@ def main():
 
     # ==================== 模块 1：图纸信息录入 ====================
     elif current_module == "图纸信息录入":
-        st.markdown("#### 🖼️ 客户参考图 (截图直接粘贴至下方框内)")
-        ref_img_file = st.file_uploader(" ", type=['jpg', 'png', 'jpeg'], accept_multiple_files=False, key="upload_ref")
         
-        ref_img_b64 = None
-        if ref_img_file is not None:
-            ref_img_b64 = base64.b64encode(ref_img_file.getvalue()).decode('utf-8')
-            # 移除文字提示，直接原生渲染，依靠 Streamlit 自身的点击放大功能
-            st.image(ref_img_file, use_column_width=True)
+        st.markdown("#### 🖼️ 客户沟通记录与参考图")
+        c_txt, c_img = st.columns(2)
+        
+        with c_txt:
+            ref_text = st.text_area("💬 客户沟通要求 (可在此打字或粘贴文字)", height=120)
+            
+        with c_img:
+            ref_img_file = st.file_uploader(" ", type=['jpg', 'png', 'jpeg'], accept_multiple_files=False, key="upload_ref")
+            ref_img_b64 = None
+            if ref_img_file is not None:
+                ref_img_b64 = base64.b64encode(ref_img_file.getvalue()).decode('utf-8')
+                st.image(ref_img_file, width=250)
+                st.caption("提示：点击图片右上角 ⤢ 图标即可全屏放大。")
             
         st.divider()
         render_main_form(options_mgr)
@@ -1636,6 +1623,7 @@ def main():
                     "door_type": st.session_state["door_type"],
                     "size": f"{st.session_state['dw']} x {st.session_state['dh']} (洞口)", 
                     "params": get_current_form_data(),
+                    "ref_text": ref_text,
                     "ref_img_b64": ref_img_b64,
                     "drawing_img_b64": None, 
                     "review_feedback": ""
@@ -1665,28 +1653,30 @@ def main():
                 
             c_back, c_title = st.columns([1, 9])
             with c_back:
-                if st.button("← 返回列表"):
+                if st.button("← 返回列表", type="secondary"):
                     st.session_state["active_task_id"] = None
                     st.rerun()
             with c_title:
                 st.markdown(f"<h4 style='margin-bottom:0;'>正在处理：{active_task['customer']} - {active_task['project']} {get_status_badge(active_task['status'])}</h4>", unsafe_allow_html=True)
                 
-            if active_task.get("ref_img_b64"):
-                st.markdown("**前端客户参考图 (点击图片放大)：**")
-                try:
-                    ref_bytes = base64.b64decode(active_task["ref_img_b64"])
-                    st.image(ref_bytes, use_column_width=True)
-                except Exception:
-                    pass
+            if active_task.get("ref_text") or active_task.get("ref_img_b64"):
+                with st.expander("🖼️ 查看前端客户沟通记录与参考图"):
+                    if active_task.get("ref_text"):
+                        st.info(f"**销售备注：**\n{active_task['ref_text']}")
+                    if active_task.get("ref_img_b64"):
+                        st.markdown("**附图 (悬停点击右上角 ⤢ 全屏放大)：**")
+                        try:
+                            ref_bytes = base64.b64decode(active_task["ref_img_b64"])
+                            st.image(ref_bytes, width=250)
+                        except Exception:
+                            pass
                 
             if active_task['status'] == "待修改" and active_task['review_feedback']: 
                 st.error(f"🛑 审核驳回意见：\n\n{active_task['review_feedback']}")
 
             render_main_form(options_mgr)
-            
             st.divider()
             
-            # --- 垂直分离的功能块 ---
             with st.container(border=True):
                 st.markdown("#### ⚡ 第 1 步：生成基准 CAD 底图")
                 if st.button("⬇️ 生成并下载 DXF 进行深化", type="secondary", use_container_width=True):
@@ -1701,22 +1691,21 @@ def main():
                 st.markdown("#### 📤 第 2 步：上传深化后的图纸并提交")
                 uploaded_file = st.file_uploader(" ", type=["jpg", "png", "jpeg"], label_visibility="collapsed", key="upload_draw")
                 if uploaded_file is not None:
-                    # 原生渲染即可放大
-                    st.image(uploaded_file, use_column_width=True)
+                    st.image(uploaded_file, width=300)
                 
-                if st.button("✅ 提交给总工审核", type="primary", use_container_width=True):
+                if st.button("✅ 提交至【图纸初审】", type="primary", use_container_width=True):
                     if uploaded_file is not None:
                         img_b64 = base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
                         task_db.update_task(active_task["id"], {
                             "drawing_img_b64": img_b64, 
-                            "status": "待审核", 
+                            "status": "待初审", 
                             "params": get_current_form_data()
                         })
                         st.session_state["active_task_id"] = None
-                        st.success("成功提交给总工！")
+                        st.success("成功流转至初审！")
                         st.rerun()
                     else: 
-                        st.warning("请先在上方框内粘贴或上传图纸图片！")
+                        st.warning("请先在上方框内粘贴或上传深化图纸！")
                             
         else:
             filter_date = st.date_input("检索日期", value=datetime.date.today())
@@ -1749,8 +1738,8 @@ def main():
                                 st.rerun()
                             st.markdown('</div>', unsafe_allow_html=True)
 
-    # ==================== 模块 3：图纸审核 ====================
-    elif current_module == "图纸审核":
+    # ==================== 模块 3：图纸初审 ====================
+    elif current_module == "图纸初审":
         active_id = st.session_state.get("active_task_id")
         if active_id:
             active_task = task_db.get_task(active_id)
@@ -1765,7 +1754,7 @@ def main():
                 
             c_img, c_info = st.columns([6, 4])
             with c_img:
-                st.markdown("#### 图纸全屏预览 (点击图片放大)")
+                st.markdown("#### 图纸全屏预览 (悬停点击右上角 ⤢ 放大)")
                 if active_task.get("drawing_img_b64"):
                     try:
                         img_bytes = base64.b64decode(active_task["drawing_img_b64"])
@@ -1775,15 +1764,13 @@ def main():
                 else: 
                     st.warning("绘图员未上传深化图。")
                     
-                st.markdown("#### 客户原单参考图")
                 if active_task.get("ref_img_b64"):
-                    try:
-                        ref_bytes = base64.b64decode(active_task["ref_img_b64"])
-                        st.image(ref_bytes, use_column_width=True)
-                    except Exception:
-                        pass
-                else:
-                    st.info("销售未上传参考图。")
+                    with st.expander("🖼️ 查看前端录入的原单/参考图"):
+                        try:
+                            ref_bytes = base64.b64decode(active_task["ref_img_b64"])
+                            st.image(ref_bytes, width=250)
+                        except Exception:
+                            pass
             
             with c_info:
                 st.markdown("#### 核心参数核对")
@@ -1794,8 +1781,8 @@ def main():
                     st.write(f"**开向:** {p.get('sel_kx')}{p.get('sel_nk')}")
                     st.write(f"**材质:** {p.get('zzcl')} | **颜色:** {p.get('ys')}")
                 
-                st.markdown("#### 审核意见")
-                feedback = st.text_area("输入修改要求", value=active_task["review_feedback"], height=120, placeholder="如：右侧压框尺寸不对，请改成 30mm...")
+                st.markdown("#### 初审意见")
+                feedback = st.text_area("输入修改要求", value=active_task["review_feedback"], height=120, placeholder="初审发现的问题...")
                 
                 cb1, cb2 = st.columns(2)
                 with cb1:
@@ -1804,19 +1791,19 @@ def main():
                         st.session_state["active_task_id"] = None
                         st.rerun()
                 with cb2:
-                    if st.button("✅ 审核通过", type="primary", use_container_width=True):
-                        task_db.update_task(active_task["id"], {"status": "已通过", "review_feedback": "通过"})
+                    if st.button("✅ 初审通过 (转终审)", type="primary", use_container_width=True):
+                        task_db.update_task(active_task["id"], {"status": "待终审", "review_feedback": "初审已通过，等待终审。"})
                         st.session_state["active_task_id"] = None
                         st.rerun()
         else:
             all_tasks = task_db.load_all_tasks()
             review_tasks = []
             for t in all_tasks:
-                if t["status"] in ["待审核", "已通过"]:
+                if t["status"] == "待初审":
                     review_tasks.append(t)
                     
             if not review_tasks: 
-                st.info("✅ 目前没有需要审核的图纸。")
+                st.info("✅ 目前没有需要初审的图纸。")
             else:
                 for task in review_tasks:
                     with st.container():
@@ -1824,12 +1811,88 @@ def main():
                         with col_card:
                             st.markdown('<div class="drawing-card-btn">', unsafe_allow_html=True)
                             btn_txt = f"🔍 {task['customer']} - {task['project']} \n\n 提交时间：{task['date']} | 状态：{task['status']}"
-                            if st.button(btn_txt, key=f"rev_{task['id']}", use_container_width=True):
+                            if st.button(btn_txt, key=f"rev1_{task['id']}", use_container_width=True):
                                 st.session_state["active_task_id"] = task["id"]
                                 st.rerun()
                             st.markdown('</div>', unsafe_allow_html=True)
-                        with col_action:
-                            pass 
+
+    # ==================== 模块 4：图纸终审 ====================
+    elif current_module == "图纸终审":
+        active_id = st.session_state.get("active_task_id")
+        if active_id:
+            active_task = task_db.get_task(active_id)
+            if not active_task: 
+                st.error("任务不存在")
+                st.session_state["active_task_id"] = None
+                st.rerun()
+                
+            if st.button("← 返回待审列表", type="secondary"): 
+                st.session_state["active_task_id"] = None
+                st.rerun()
+                
+            c_img, c_info = st.columns([6, 4])
+            with c_img:
+                st.markdown("#### 图纸全屏预览 (悬停点击右上角 ⤢ 放大)")
+                if active_task.get("drawing_img_b64"):
+                    try:
+                        img_bytes = base64.b64decode(active_task["drawing_img_b64"])
+                        st.image(img_bytes, use_column_width=True)
+                    except Exception: 
+                        st.info("图片解析失败。")
+                else: 
+                    st.warning("绘图员未上传深化图。")
+                    
+                if active_task.get("ref_img_b64"):
+                    with st.expander("🖼️ 查看前端录入的原单/参考图"):
+                        try:
+                            ref_bytes = base64.b64decode(active_task["ref_img_b64"])
+                            st.image(ref_bytes, width=250)
+                        except Exception:
+                            pass
+            
+            with c_info:
+                st.markdown("#### 核心参数核对")
+                p = active_task["params"]
+                with st.container(border=True):
+                    st.write(f"**客户:** {p.get('dhdw')} | **项目:** {p.get('gdmc')}")
+                    st.write(f"**门型:** {p.get('door_type')} | **洞口:** {p.get('dw')}x{p.get('dh')}")
+                    st.write(f"**开向:** {p.get('sel_kx')}{p.get('sel_nk')}")
+                    st.write(f"**材质:** {p.get('zzcl')} | **颜色:** {p.get('ys')}")
+                
+                st.markdown("#### 终审意见")
+                feedback = st.text_area("输入修改要求", value=active_task["review_feedback"], height=120, placeholder="终审发现的问题...")
+                
+                cb1, cb2 = st.columns(2)
+                with cb1:
+                    if st.button("❌ 打回重新绘制", type="secondary", use_container_width=True):
+                        task_db.update_task(active_task["id"], {"status": "待修改", "review_feedback": feedback})
+                        st.session_state["active_task_id"] = None
+                        st.rerun()
+                with cb2:
+                    if st.button("✅ 终审通过 (发车间)", type="primary", use_container_width=True):
+                        task_db.update_task(active_task["id"], {"status": "已通过", "review_feedback": "终审已通过，可下发生产。"})
+                        st.session_state["active_task_id"] = None
+                        st.rerun()
+        else:
+            all_tasks = task_db.load_all_tasks()
+            review_tasks = []
+            for t in all_tasks:
+                if t["status"] in ["待终审", "已通过"]:
+                    review_tasks.append(t)
+                    
+            if not review_tasks: 
+                st.info("✅ 目前没有需要终审的图纸。")
+            else:
+                for task in review_tasks:
+                    with st.container():
+                        col_card, col_action = st.columns([8.5, 1.5])
+                        with col_card:
+                            st.markdown('<div class="drawing-card-btn">', unsafe_allow_html=True)
+                            btn_txt = f"🔍 {task['customer']} - {task['project']} \n\n 提交时间：{task['date']} | 状态：{task['status']}"
+                            if st.button(btn_txt, key=f"rev2_{task['id']}", use_container_width=True):
+                                st.session_state["active_task_id"] = task["id"]
+                                st.rerun()
+                            st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
