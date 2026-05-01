@@ -1,7 +1,7 @@
 """
 西州将军铜门 - 生产图纸协同系统 (ERP 终极流水线版)
 - 架构升级：四大标准流水线（录入 -> 绘制 -> 初审 -> 终审）。
-- 交互革新：原生小图预览，点击无损放大；导航栏物理级内凹按压反馈。
+- 交互革新：原生小图预览，任意点击无损放大；导航栏物理级内凹按压反馈。
 - 输入强化：文字记录与图片上传双轨并行；输入框强制高对比度描边。
 - 100% 遵守 PEP8 规范，代码全部展开，安全可靠。
 """
@@ -266,35 +266,33 @@ def set_custom_style():
     header, footer, .stDeployButton { visibility: hidden !important; display: none !important; }
 
     /* ======== 核心交互：按钮物理按压与凸起效果 ======== */
-    /* 选中的模块按钮 / 核心提交按钮 (Primary) -> 赋予内凹的真实按压感 */
-    .stButton > button[kind="primary"] { 
+    .nav-btn-active > button, .stButton > button[kind="primary"] { 
         background-color: #007AFF !important; 
         color: white !important; 
         border: none !important; 
         border-radius: 8px !important;
         font-weight: bold !important;
-        box-shadow: inset 0 4px 6px rgba(0,0,0,0.3) !important; /* 核心：内阴影模拟被深深按下 */
-        transform: translateY(2px) !important; /* 核心：位置物理下陷 */
+        box-shadow: inset 0 4px 6px rgba(0,0,0,0.3) !important; /* 内阴影：模拟被深深按下 */
+        transform: translateY(2px) !important; /* 位置：物理下陷 */
         transition: all 0.2s ease !important;
     }
     
-    /* 未选中的模块按钮 / 普通操作按钮 (Secondary) -> 赋予凸起的立体感 */
-    .stButton > button[kind="secondary"] { 
+    .nav-btn-inactive > button, .stButton > button[kind="secondary"] { 
         background-color: #FFFFFF !important; 
         color: #1C1C1E !important; 
         border: 1px solid #C7C7CC !important; 
         border-radius: 8px !important;
         font-weight: 500 !important;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.06) !important; /* 核心：外阴影模拟凸起按键 */
+        box-shadow: 0 4px 8px rgba(0,0,0,0.06) !important; /* 外阴影：模拟凸起按键 */
         transform: translateY(0px) !important;
         transition: all 0.2s ease !important;
     }
-    .stButton > button[kind="secondary"]:hover {
+    .nav-btn-inactive > button:hover, .stButton > button[kind="secondary"]:hover {
         border-color: #007AFF !important;
         color: #007AFF !important;
         box-shadow: 0 6px 12px rgba(0, 122, 255, 0.1) !important;
     }
-    .stButton > button[kind="secondary"]:active {
+    .nav-btn-inactive > button:active, .stButton > button[kind="secondary"]:active {
         box-shadow: inset 0 2px 4px rgba(0,0,0,0.1) !important;
         transform: translateY(2px) !important;
     }
@@ -313,12 +311,12 @@ def set_custom_style():
         font-size: 14px !important; 
         border-radius: 6px !important; 
         background-color: #FAFAFC !important; 
-        border: 1px solid #C7C7CC !important;  /* 核心：极其清晰的边框线 */
+        border: 1px solid #C7C7CC !important;  
         transition: all 0.2s ease;
     }
     .stTextInput input:focus, .stNumberInput input:focus, .stSelectbox div[data-baseweb="select"] > div:focus-within, .stTextArea textarea:focus {
         background-color: #FFFFFF !important; 
-        border: 2px solid #007AFF !important; /* 核心：选中时变成两像素蓝边 */
+        border: 2px solid #007AFF !important; 
         box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15) !important;
     }
     
@@ -337,9 +335,31 @@ def set_custom_style():
         border-bottom: 1px solid #F2F2F7; 
     }
 
-    /* ======== 紧凑型上传框 (方形) ======== */
+    /* ======== 极致重构：原生图片点击即全屏 ======== */
+    [data-testid="stImage"] {
+        position: relative !important;
+        cursor: pointer !important;
+        border-radius: 8px !important;
+        overflow: hidden !important;
+        border: 1px solid #E5E5EA !important;
+    }
+    /* 把原生的全屏按钮放大到铺满整张图，并且透明。这样点击任何地方都是全屏 */
+    [data-testid="stImage"] [data-testid="StyledFullScreenButton"] {
+        opacity: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        z-index: 10 !important;
+    }
+
+    /* ======== 紧凑型方形上传框定制 ======== */
+    [data-testid="stFileUploader"] {
+        width: 100% !important;
+    }
     [data-testid="stFileUploader"] section {
-        padding: 1rem !important;
+        padding: 0 !important;
         background-color: #FAFAFC !important;
         border: 2px dashed #C7C7CC !important;
         border-radius: 8px !important;
@@ -347,33 +367,59 @@ def set_custom_style():
         flex-direction: column !important;
         align-items: center !important;
         justify-content: center !important;
-        min-height: 80px !important;
+        min-height: 80px !important; /* 极大压缩高度 */
     }
-    [data-testid="stFileUploader"] section:hover { border-color: #007AFF !important; background-color: #F0F8FF !important; }
+    [data-testid="stFileUploader"] section:hover { 
+        border-color: #007AFF !important; 
+        background-color: #F0F8FF !important; 
+    }
+    /* 隐藏所有原有的啰嗦提示 */
     [data-testid="stFileUploader"] section > div > span { display: none !important; } 
     [data-testid="stFileUploader"] section > div > small { display: none !important; } 
     [data-testid="stFileUploader"] section > button { display: none !important; }
+    [data-testid="stFileUploaderDropzoneInstructions"] { display: none !important; }
     
+    /* 伪造极简提示文字 */
     [data-testid="stFileUploader"] section::before {
         content: "➕ 点击框内后 Ctrl+V 粘贴 / 或拖拽图片";
         color: #8E8E93;
-        font-weight: 600;
-        font-size: 14px;
+        font-weight: 500;
+        font-size: 13px;
         text-align: center;
         pointer-events: none;
     }
 
-    /* ======== 列表任务卡片 ======== */
-    .task-card { 
-        background: #FFF; 
-        border: 1px solid #E5E5EA; 
-        border-radius: 8px; 
-        padding: 16px; 
-        margin-bottom: 8px; 
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02); 
+    /* ======== 图纸点击卡片与删除 ======== */
+    .drawing-card-btn > button {
+        background-color: #FFFFFF !important;
+        border: 1px solid #E5E5EA !important;
+        border-radius: 10px !important;
+        text-align: left !important;
+        padding: 16px 20px !important;
+        height: 100% !important;
+        color: #1C1C1E !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02) !important;
+        transition: all 0.2s ease;
     }
-    .task-title { font-size: 16px; font-weight: 600; color: #1D1D1F; margin-bottom: 4px; }
-    .task-sub { font-size: 13px; color: #86868B; }
+    .drawing-card-btn > button:hover {
+        border-color: #007AFF !important;
+        box-shadow: 0 6px 16px rgba(0, 122, 255, 0.1) !important;
+        transform: translateY(-2px);
+    }
+    .drawing-card-btn > button:active { transform: scale(0.98); }
+
+    /* ======== 红色删除按钮 ======== */
+    .delete-btn > button {
+        background-color: #FFF0F0 !important;
+        color: #FF3B30 !important;
+        border: 1px solid #FFD1D1 !important;
+        border-radius: 10px !important;
+        height: 100% !important;
+    }
+    .delete-btn > button:hover {
+        background-color: #FF3B30 !important;
+        color: #FFFFFF !important;
+    }
 
     /* 状态徽章 */
     .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
@@ -381,6 +427,8 @@ def set_custom_style():
     .badge-review { background-color: #FFF5E5; color: #FF9500; }
     .badge-modify { background-color: #FFE5E5; color: #FF3B30; }
     .badge-success { background-color: #E5FBE5; color: #34C759; }
+    
+    div[data-testid="column"] { padding: 0 6px !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -1548,15 +1596,14 @@ def render_top_nav():
         if st.session_state["current_module"] == item["module"]:
             is_active = True
             
+        cls_name = "nav-btn-active" if is_active else "nav-btn-inactive"
         with cols[i]:
-            if is_active:
-                if st.button(item["title"], use_container_width=True, type="primary", key=f"nav_{item['module']}"):
-                    pass
-            else:
-                if st.button(item["title"], use_container_width=True, type="secondary", key=f"nav_{item['module']}"):
-                    st.session_state["current_module"] = item["module"]
-                    st.session_state["active_task_id"] = None
-                    st.rerun()
+            st.markdown(f'<div class="{cls_name}">', unsafe_allow_html=True)
+            if st.button(item["title"], use_container_width=True, key=f"nav_{item['module']}"):
+                st.session_state["current_module"] = item["module"]
+                st.session_state["active_task_id"] = None
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
     with cols[-1]:
         st.markdown(f"<div style='text-align:right; color:#8E8E93; font-size:13px; margin-top:2px;'>👤 {st.session_state['user_name']}</div>", unsafe_allow_html=True)
@@ -1593,19 +1640,18 @@ def main():
     # ==================== 模块 1：图纸信息录入 ====================
     elif current_module == "图纸信息录入":
         
-        st.markdown("#### 🖼️ 客户沟通记录与参考图")
-        c_txt, c_img = st.columns(2)
+        st.markdown("#### 💬 客户沟通记录与图纸上传")
+        c_txt, c_img = st.columns([1, 1])
         
         with c_txt:
-            ref_text = st.text_area("💬 客户沟通要求 (可在此打字或粘贴文字)", height=120)
+            ref_text = st.text_area("✍️ 沟通要求 (在此打字或粘贴文字)", height=80, label_visibility="collapsed", placeholder="✍️ 沟通要求 (在此打字或粘贴文字)")
             
         with c_img:
             ref_img_file = st.file_uploader(" ", type=['jpg', 'png', 'jpeg'], accept_multiple_files=False, key="upload_ref")
             ref_img_b64 = None
             if ref_img_file is not None:
                 ref_img_b64 = base64.b64encode(ref_img_file.getvalue()).decode('utf-8')
-                st.image(ref_img_file, width=250)
-                st.caption("提示：点击图片右上角 ⤢ 图标即可全屏放大。")
+                st.image(ref_img_file, use_column_width=True)
             
         st.divider()
         render_main_form(options_mgr)
@@ -1664,7 +1710,7 @@ def main():
                     if active_task.get("ref_text"):
                         st.info(f"**销售备注：**\n{active_task['ref_text']}")
                     if active_task.get("ref_img_b64"):
-                        st.markdown("**附图 (悬停点击右上角 ⤢ 全屏放大)：**")
+                        st.markdown("**附图 (点击图片任意区域放大)：**")
                         try:
                             ref_bytes = base64.b64decode(active_task["ref_img_b64"])
                             st.image(ref_bytes, width=250)
@@ -1677,6 +1723,7 @@ def main():
             render_main_form(options_mgr)
             st.divider()
             
+            # --- 垂直分离的功能块 ---
             with st.container(border=True):
                 st.markdown("#### ⚡ 第 1 步：生成基准 CAD 底图")
                 if st.button("⬇️ 生成并下载 DXF 进行深化", type="secondary", use_container_width=True):
@@ -1688,10 +1735,10 @@ def main():
                         st.download_button("⬇️ 确认下载 DXF", data=buffer.getvalue(), file_name=f"基准图纸_{active_task['id']}.dxf", mime="application/dxf", use_container_width=True)
             
             with st.container(border=True):
-                st.markdown("#### 📤 第 2 步：上传深化后的图纸并提交")
+                st.markdown("#### 📤 第 2 步：上传深化图纸并提交初审")
                 uploaded_file = st.file_uploader(" ", type=["jpg", "png", "jpeg"], label_visibility="collapsed", key="upload_draw")
                 if uploaded_file is not None:
-                    st.image(uploaded_file, width=300)
+                    st.image(uploaded_file, use_column_width=True)
                 
                 if st.button("✅ 提交至【图纸初审】", type="primary", use_container_width=True):
                     if uploaded_file is not None:
@@ -1705,7 +1752,7 @@ def main():
                         st.success("成功流转至初审！")
                         st.rerun()
                     else: 
-                        st.warning("请先在上方框内粘贴或上传深化图纸！")
+                        st.warning("请先在上方框内粘贴或上传深化图纸图片！")
                             
         else:
             filter_date = st.date_input("检索日期", value=datetime.date.today())
@@ -1754,7 +1801,7 @@ def main():
                 
             c_img, c_info = st.columns([6, 4])
             with c_img:
-                st.markdown("#### 图纸全屏预览 (悬停点击右上角 ⤢ 放大)")
+                st.markdown("#### 图纸全屏预览 (点击图片任意区域放大)")
                 if active_task.get("drawing_img_b64"):
                     try:
                         img_bytes = base64.b64decode(active_task["drawing_img_b64"])
@@ -1832,7 +1879,7 @@ def main():
                 
             c_img, c_info = st.columns([6, 4])
             with c_img:
-                st.markdown("#### 图纸全屏预览 (悬停点击右上角 ⤢ 放大)")
+                st.markdown("#### 图纸全屏预览 (点击图片任意区域放大)")
                 if active_task.get("drawing_img_b64"):
                     try:
                         img_bytes = base64.b64decode(active_task["drawing_img_b64"])
