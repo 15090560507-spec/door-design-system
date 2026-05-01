@@ -1,9 +1,9 @@
 """
-西州将军铜门 - 生产协同管理系统 (SaaS 尊享视觉优化版)
-- 优化：输入框增加清晰描边边界，不再模糊。
-- 优化：顶部导航选中状态采用原生 Primary 渲染，状态对比极其醒目。
-- 优化：上传组件支持拖拽与 Ctrl+V 快捷截图粘贴。
-- 完全遵循 PEP8 标准缩进，代码清爽安全。
+西州将军铜门 - 生产协同管理系统 (SaaS 影像交互强化版)
+- 优化：移除文本解析，专注表单。
+- 优化：上传控件重构为方形极简框，支持原生 Ctrl+V 截图粘贴。
+- 优化：全链路缩略图展示，点击调用原生 Dialog 弹窗查看大图。
+- 绝对无分号压缩，100% 遵循规范。
 """
 import sys
 import os
@@ -13,9 +13,8 @@ import ezdxf
 import io
 import datetime
 import math
-import re
-import json
 import base64
+import json
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, field
 
@@ -32,6 +31,16 @@ HISTORY_FILE = os.path.join(DATA_DIR, 'order_history.json')
 CUSTOM_OPTIONS_FILE = os.path.join(DATA_DIR, 'custom_options.json')
 TASKS_DB_FILE = os.path.join(DATA_DIR, 'tasks_database.json')
 USERS_DB_FILE = os.path.join(DATA_DIR, 'users_database.json')
+
+# ===================== 原生弹窗组件 (Lightbox) =====================
+# 这是 Streamlit 原生的弹窗装饰器，点击后会悬浮在页面正中央
+@st.dialog("高清图纸审查", width="large")
+def show_image_modal(b64_str: str):
+    try:
+        img_bytes = base64.b64decode(b64_str)
+        st.image(img_bytes, use_column_width=True)
+    except Exception:
+        st.error("图片解析失败")
 
 # ===================== 核心配置 =====================
 @dataclass
@@ -63,7 +72,7 @@ class Config:
 
 CONFIG = Config()
 
-# ===================== 数据库引擎：用户权限 =====================
+# ===================== 数据库管理引擎 =====================
 class UserDatabaseManager:
     def __init__(self, file_path):
         self.file_path = file_path
@@ -119,7 +128,6 @@ class UserDatabaseManager:
 
 user_db = UserDatabaseManager(USERS_DB_FILE)
 
-# ===================== 数据库引擎：任务流转 =====================
 class TaskDatabaseManager:
     def __init__(self, file_path):
         self.file_path = file_path
@@ -167,11 +175,9 @@ class TaskDatabaseManager:
 
 task_db = TaskDatabaseManager(TASKS_DB_FILE)
 
-# ===================== 本地字典记忆类 =====================
 class HistoryManager:
     def __init__(self, file_path):
         self.file_path = file_path
-
     def load(self):
         if os.path.exists(self.file_path):
             try:
@@ -180,14 +186,12 @@ class HistoryManager:
             except Exception:
                 return {"dhdw": [], "gdmc": [], "ys": []}
         return {"dhdw": [], "gdmc": [], "ys": []}
-
     def save(self, history):
         try:
             with open(self.file_path, 'w', encoding='utf-8') as f:
                 json.dump(history, f, ensure_ascii=False, indent=2)
         except Exception:
             pass
-
     def add(self, field, value):
         if not value.strip():
             return
@@ -202,7 +206,6 @@ class HistoryManager:
 class CustomOptionsManager:
     def __init__(self, file_path):
         self.file_path = file_path
-
     def load(self):
         if os.path.exists(self.file_path):
             try:
@@ -211,14 +214,12 @@ class CustomOptionsManager:
             except Exception:
                 return {"materials": [], "handles": [], "hinges": []}
         return {"materials": [], "handles": [], "hinges": []}
-
     def save(self, options):
         try:
             with open(self.file_path, 'w', encoding='utf-8') as f:
                 json.dump(options, f, ensure_ascii=False, indent=2)
         except Exception:
             pass
-
     def _add(self, key, value):
         if not value.strip():
             return
@@ -229,57 +230,69 @@ class CustomOptionsManager:
             options[key].insert(0, value)
             options[key] = options[key][:30]
         self.save(options)
-
     def add_material(self, value):
         self._add("materials", value)
-
     def add_handle(self, value):
         self._add("handles", value)
-
     def add_hinge(self, value):
         self._add("hinges", value)
-
     def get_all_materials(self):
         custom = self.load().get("materials", [])
         return list(dict.fromkeys(custom + CONFIG.MATERIAL_OPTIONS.copy()))
-
     def get_all_handles(self):
         custom = self.load().get("handles", [])
         return list(dict.fromkeys(custom + CONFIG.HANDLE_OPTIONS.copy()))
-
     def get_all_hinges(self):
         custom = self.load().get("hinges", [])
         return list(dict.fromkeys(custom + list(CONFIG.HINGE_TYPES.keys())))
 
 
-# ===================== UI 深度重构高级系统 (Apple Style) =====================
+# ===================== 核心样式定制 (Apple/iOS 风格) =====================
 def set_custom_style():
     st.markdown("""
     <style>
-    /* 全局高级背景调色与字体 */
     .stApp { 
         background-color: #F2F2F7; 
         font-family: "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
     }
     
-    /* 隐藏默认占位 */
     header, footer, .stDeployButton { visibility: hidden !important; display: none !important; }
+    
+    /* ======== 导航栏方形按钮 ======== */
+    .nav-btn-active > button {
+        background-color: #1C1C1E !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15) !important;
+        transition: transform 0.1s ease;
+    }
+    .nav-btn-active > button:active { transform: scale(0.95); }
 
-    /* ======== 容器悬浮卡片 ======== */
+    .nav-btn-inactive > button {
+        background-color: #FFFFFF !important;
+        color: #8E8E93 !important;
+        border: 1px solid #E5E5EA !important;
+        border-radius: 8px !important;
+        font-weight: 500 !important;
+        transition: all 0.2s ease;
+    }
+    .nav-btn-inactive > button:hover {
+        color: #1C1C1E !important;
+        border-color: #C7C7CC !important;
+    }
+
+    /* ======== 表单卡片悬浮与边缘 ======== */
     div[data-testid="stVerticalBlock"] > div > div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FFFFFF !important; 
         border-radius: 12px !important; 
         border: 1px solid rgba(0,0,0,0.05) !important;
         box-shadow: 0 4px 20px rgba(0,0,0,0.03) !important; 
         padding: 20px 24px !important;
-        transition: box-shadow 0.3s ease;
-    }
-    div[data-testid="stVerticalBlock"] > div > div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-        box-shadow: 0 8px 30px rgba(0,0,0,0.08) !important;
     }
     
-    /* ======== 交互输入框精致化与【明确边界】 ======== */
-    /* 添加了明显的 border: 1px solid #C7C7CC */
+    /* ======== 输入框明确边界重写 ======== */
     .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] > div, .stTextArea textarea {
         font-size: 14px !important; 
         border-radius: 6px !important; 
@@ -299,85 +312,76 @@ def set_custom_style():
         color: #8E8E93 !important; 
         margin-bottom: -2px !important; 
     }
-    h4 { 
-        font-size: 17px !important; 
-        font-weight: 600 !important; 
-        color: #1C1C1E !important; 
-        margin-bottom: 16px !important; 
-        padding-bottom: 10px !important; 
-        border-bottom: 1px solid #F2F2F7; 
+
+    /* ======== 方形极简上传框定制 ======== */
+    [data-testid="stFileUploader"] {
+        width: 100% !important;
+    }
+    [data-testid="stFileUploader"] section {
+        padding: 1.5rem !important;
+        background-color: #FAFAFC !important;
+        border: 2px dashed #C7C7CC !important;
+        border-radius: 12px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-height: 120px !important;
+    }
+    [data-testid="stFileUploader"] section:hover { border-color: #007AFF !important; }
+    [data-testid="stFileUploader"] section > div > span { display: none !important; } 
+    [data-testid="stFileUploader"] section > div > small { display: none !important; } 
+    [data-testid="stFileUploader"] section > button { display: none !important; }
+    
+    /* 伪造里面的提示文字 */
+    [data-testid="stFileUploader"] section::before {
+        content: "➕ 点击框内 Ctrl+V 粘贴 / 或拖拽图片至此";
+        color: #8E8E93;
+        font-weight: 600;
+        font-size: 14px;
+        text-align: center;
+        pointer-events: none;
     }
 
-    /* ======== 按钮基础样式 ======== */
+    /* ======== 各种按钮统一样式 ======== */
     .stButton > button { 
         border-radius: 8px !important; 
         font-weight: 600 !important; 
-        transition: transform 0.1s ease, box-shadow 0.1s ease !important;
+        transition: transform 0.1s ease !important;
     }
-    .stButton > button:active {
-        transform: scale(0.97) !important;
-    }
+    .stButton > button:active { transform: scale(0.97) !important; }
     .stButton > button[kind="primary"] { 
-        background-color: #007AFF !important; 
-        color: white !important; 
-        border: none !important; 
-        box-shadow: 0 4px 10px rgba(0, 122, 255, 0.2) !important;
+        background-color: #007AFF !important; color: white !important; border: none !important; 
     }
     .stButton > button[kind="secondary"] { 
-        background-color: #FFFFFF !important; 
-        color: #1C1C1E !important; 
-        border: 1px solid #C7C7CC !important; 
-    }
-    div[data-testid="column"] { 
-        padding: 0 6px !important; 
+        background-color: #FFFFFF !important; color: #1C1C1E !important; border: 1px solid #C7C7CC !important; 
     }
 
-    /* ======== 图纸点击卡片 (伪装成按钮) ======== */
+    /* ======== 图纸点击卡片与删除 ======== */
     .drawing-card-btn > button {
         background-color: #FFFFFF !important;
         border: 1px solid #E5E5EA !important;
         border-radius: 10px !important;
         text-align: left !important;
         padding: 16px 20px !important;
-        height: 100% !important;
         color: #1C1C1E !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.02) !important;
-        transition: all 0.2s ease;
     }
     .drawing-card-btn > button:hover {
         border-color: #007AFF !important;
         box-shadow: 0 6px 16px rgba(0, 122, 255, 0.1) !important;
-        transform: translateY(-2px);
     }
-    .drawing-card-btn > button:active { transform: scale(0.98); }
-
-    /* ======== 红色删除按钮 ======== */
     .delete-btn > button {
-        background-color: #FFF0F0 !important;
-        color: #FF3B30 !important;
-        border: 1px solid #FFD1D1 !important;
-        border-radius: 10px !important;
-        height: 100% !important;
+        background-color: #FFF0F0 !important; color: #FF3B30 !important; border: 1px solid #FFD1D1 !important; border-radius: 10px !important;
     }
-    .delete-btn > button:hover {
-        background-color: #FF3B30 !important;
-        color: #FFFFFF !important;
-    }
-
-    /* 状态徽章 */
-    .badge { 
-        display: inline-block; 
-        padding: 4px 12px; 
-        border-radius: 12px; 
-        font-size: 12px; 
-        font-weight: 600; 
-    }
+    
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
     .badge-pending { background-color: #F2F2F7; color: #1C1C1E; }
     .badge-review { background-color: #FFF5E5; color: #FF9500; }
     .badge-modify { background-color: #FFE5E5; color: #FF3B30; }
     .badge-success { background-color: #E5FBE5; color: #34C759; }
     </style>
     """, unsafe_allow_html=True)
+
 
 def init_session_state():
     if "logged_in" not in st.session_state: 
@@ -429,8 +433,7 @@ def get_status_badge(status):
     css_class = mapping.get(status, "badge-pending")
     return f'<span class="badge {css_class}">{status}</span>'
 
-
-# ===================== 表单与解析组件 =====================
+# ===================== 绘图底层支持组件 =====================
 class DimensionCalculator:
     def __init__(self, params: Dict[str, Any]): 
         self.p = params
@@ -504,262 +507,6 @@ class EzdxfDrawer:
             block.add_lwpolyline([(-15, -150), (15, -150), (15, 150), (-15, 150)], close=True)
         self.ms.add_blockref(block_name, insert_point, dxfattribs={'layer': layer})
 
-def parse_batch_text(text: str) -> Dict[str, Any]:
-    result = {}
-    if not text.strip(): 
-        return result
-    text = text.strip().replace("\n", "").replace(" ", "")
-    
-    dhdw_match = re.search(r"订货单位([^，；。\d]+)", text)
-    if dhdw_match: 
-        result["dhdw"] = dhdw_match.group(1).strip()
-        
-    gdmc_match = re.search(r"工地名称([^，；。\d外包套洞口宽拉手]+)", text)
-    if gdmc_match: 
-        result["gdmc"] = gdmc_match.group(1).strip()
-        
-    mat_match = re.search(r"(\d+\.?\d*的不锈钢镀铜|\d+\.?\d*的纯铜|\d+\.?\d*的纯铝)", text)
-    if mat_match: 
-        result["zzcl"] = mat_match.group(1).strip()
-    else: 
-        m2 = re.search(r"制作材料[:=]([^,；;]+)", text)
-        if m2: 
-            result["zzcl"] = m2.group(1).strip()
-            
-    if re.search(r"\d+\.?\d*#色", text): 
-        result["ys"] = "红古铜"
-    else:
-        ys1 = re.search(r"(红古铜|黄古铜|古铜|拉丝金|拉丝银)", text)
-        if ys1: 
-            result["ys"] = ys1.group(1).strip()
-        else: 
-            ys2 = re.search(r"颜色[:=]([^,；;]+)", text)
-            if ys2: 
-                result["ys"] = ys2.group(1).strip()
-                
-    zmls = re.search(r"(标配拉手|铝雕拉手|铝雕滑盖拉手|铝雕长拉手|自制长拉手)", text)
-    if zmls: 
-        result["zmls"] = zmls.group(1).strip()
-    else: 
-        zm2 = re.search(r"正面拉手[:=]([^,；;]+)", text)
-        if zm2: 
-            result["zmls"] = zm2.group(1).strip()
-            
-    fmls = re.search(r"反面拉手[:=]([^,；;]+)", text)
-    if fmls: 
-        result["fmls"] = fmls.group(1).strip()
-        
-    if "单门" in text: 
-        result["door_type"] = "单门"
-    elif "对开门" in text: 
-        result["door_type"] = "对开门"
-    elif "子母门" in text: 
-        result["door_type"] = "子母门"
-        m = re.search(r"母门宽度[:=](\d+)mm?", text)
-        if m: 
-            result["mother_door_width"] = int(m.group(1))
-    elif "折叠四开门" in text: 
-        result["door_type"] = "折叠四开门"
-        m = re.search(r"中门宽度[:=](\d+)mm?", text)
-        if m: 
-            result["mid_door_width"] = int(m.group(1))
-    elif "两定两开" in text or "两定两开门" in text:
-        result["door_type"] = "两定两开"
-        m = re.search(r"中门宽度[:=](\d+)mm?", text)
-        if m: 
-            result["mid_door_width"] = int(m.group(1))
-        m2 = re.search(r"立柱宽度[:=]([^,；;]+)", text)
-        if m2: 
-            result["pillar_width_str"] = m2.group(1).strip()
-        if "有立柱" in text: 
-            result["has_pillar"] = True
-        elif "无立柱" in text: 
-            result["has_pillar"] = False
-            
-    if "内右开" in text: 
-        result["sel_nk"] = "内开"
-        result["sel_kx"] = "右开"
-    elif "内左开" in text: 
-        result["sel_nk"] = "内开"
-        result["sel_kx"] = "左开"
-    elif "外右开" in text: 
-        result["sel_nk"] = "外开"
-        result["sel_kx"] = "右开"
-    elif "外左开" in text: 
-        result["sel_nk"] = "外开"
-        result["sel_kx"] = "左开"
-    elif "左开" in text: 
-        result["sel_kx"] = "左开"
-    elif "右开" in text: 
-        result["sel_kx"] = "右开"
-        
-    if "内开" in text: 
-        result["sel_nk"] = "内开"
-    elif "外开" in text: 
-        result["sel_nk"] = "外开"
-        
-    out_m = re.search(r"外包套[:=]?(\d+)", text)
-    if out_m: 
-        result["has_outer"] = True
-        result["trim_front_in"] = int(out_m.group(1))
-    elif "无外包套" in text: 
-        result["has_outer"] = False
-        
-    in_m = re.search(r"内包套[:=]?(\d+)", text)
-    if in_m: 
-        result["has_inner"] = True
-        result["trim_back_in"] = int(in_m.group(1))
-    elif "无内包套" in text: 
-        result["has_inner"] = False
-        
-    dw_dh = re.search(r"洞口宽(\d+)\*(\d+)", text)
-    if dw_dh: 
-        result["dw"] = int(dw_dh.group(1))
-        result["dh"] = int(dw_dh.group(2))
-    else:
-        d1 = re.search(r"洞口宽[:=](\d+)", text)
-        if d1: 
-            result["dw"] = int(d1.group(1))
-        d2 = re.search(r"洞口高[:=](\d+)", text)
-        if d2: 
-            result["dh"] = int(d2.group(1))
-            
-    li_m = re.search(r"见光宽(\d+)\*(\d+)", text)
-    if li_m: 
-        result["light_w"] = int(li_m.group(1))
-        result["light_h"] = int(li_m.group(2))
-        result["use_light_size"] = True
-    else:
-        lw = re.search(r"见光宽[:=]?(\d+)", text)
-        lh = re.search(r"见光高[:=]?(\d+)", text)
-        if lw and lh: 
-            result["light_w"] = int(lw.group(1))
-            result["light_h"] = int(lh.group(1))
-            result["use_light_size"] = True
-            
-    h1 = re.search(r"绘图员[:=]([^,；;]+)", text)
-    if h1: 
-        result["hhxd"] = h1.group(1).strip()
-        
-    s1 = re.search(r"数量[:=]([^,；;]+)", text)
-    if s1: 
-        result["sl"] = s1.group(1).strip()
-        
-    d1 = re.search(r"订单号[:=]([^,；;]+)", text)
-    if d1: 
-        result["ddh"] = d1.group(1).strip()
-        
-    hy1 = re.search(r"合页数量[:=](\d+)个", text)
-    if hy1: 
-        result["hysl"] = f"{hy1.group(1)}个/扇"
-        
-    h2 = re.search(r"(葫芦头合页|可拆卸合页|暗合页|明合页暗装|明合页)", text)
-    if h2: 
-        result["sel_hys"] = h2.group(1).strip()
-        
-    l1 = re.search(r"(标准锁体|防盗锁体|霸王锁体|快装锁体)", text)
-    if l1: 
-        result["st_val"] = l1.group(1).strip()
-        
-    q1 = re.search(r"墙厚[:=](\d+)", text)
-    if q1: 
-        result["qh"] = int(q1.group(1))
-        
-    m1 = re.search(r"门扇厚度[:=](\d+)", text)
-    if m1: 
-        result["mshd"] = int(m1.group(1))
-        
-    sm1 = re.search(r"备注[:=]([^,；;]+)", text)
-    if sm1: 
-        result["sm"] = sm1.group(1).strip()
-        
-    if "气窗玻璃" in text: 
-        result["sel_qc"] = "玻璃"
-    elif "气窗封闭" in text: 
-        result["sel_qc"] = "封闭"
-    elif "无气窗" in text: 
-        result["sel_qc"] = "无"
-        
-    qc1 = re.search(r"气窗高度[:=](\d+)", text)
-    if qc1: 
-        result["qc_height"] = int(qc1.group(1))
-        
-    if "有门楣" in text: 
-        result["has_mm"] = True
-    elif "无门楣" in text: 
-        result["has_mm"] = False
-        
-    mm1 = re.search(r"门楣高度[:=](\d+)", text)
-    if mm1: 
-        result["mm_height"] = int(mm1.group(1))
-        
-    ov1 = re.search(r"门套压框宽[:=](\d+)", text)
-    if ov1: 
-        result["overlap"] = int(ov1.group(1))
-        
-    f1 = re.search(r"左框[:=]([^,；;]+)", text)
-    if f1: 
-        result["fw_left_str"] = f1.group(1).strip()
-    else: 
-        result["fw_left_str"] = "60/60"
-        
-    f2 = re.search(r"右框[:=]([^,；;]+)", text)
-    if f2: 
-        result["fw_right_str"] = f2.group(1).strip()
-    else: 
-        result["fw_right_str"] = "60/60"
-        
-    f3 = re.search(r"上框宽[:=]([^,；;]+)", text)
-    if f3: 
-        result["fw_top_str"] = f3.group(1).strip()
-    else: 
-        result["fw_top_str"] = "60/60"
-        
-    t1 = re.search(r"下槛高[:=]([^,；;]+)", text)
-    if t1: 
-        result["th_str"] = t1.group(1).strip()
-    else: 
-        result["th_str"] = "60/60"
-        
-    g1 = re.search(r"左右门缝[:=]([^,；;]+)", text)
-    if g1: 
-        result["left_right_gap_str"] = g1.group(1).strip()
-        
-    g2 = re.search(r"上下门缝[:=]([^,；;]+)", text)
-    if g2: 
-        result["top_bottom_gap_str"] = g2.group(1).strip()
-        
-    g3 = re.search(r"中缝隙[:=](\d+)", text)
-    if g3: 
-        result["middle_gap"] = int(g3.group(1))
-        
-    p1 = re.search(r"立柱宽度[:=]([^,；;]+)", text)
-    if p1: 
-        result["pillar_width_str"] = p1.group(1).strip()
-        
-    z1 = re.search(r"正面款式[:=]([^,；;]+)", text)
-    if z1: 
-        result["zmks"] = z1.group(1).strip()
-        
-    fm1 = re.search(r"反面款式[:=]([^,；;]+)", text)
-    if fm1: 
-        result["fmks"] = fm1.group(1).strip()
-        
-    if "高低槛" in text: 
-        result["threshold_type"] = "高低槛"
-    elif "平底槛" in text: 
-        result["threshold_type"] = "平底槛"
-        
-    d_x = re.search(r"高低槛尺寸[:=](\d+)/(\d+)", text)
-    if d_x: 
-        result["dxk"] = d_x.group(1).strip()
-        result["gxk"] = d_x.group(2).strip()
-        
-    p_k = re.search(r"平底槛尺寸[:=](\d+)", text)
-    if p_k: 
-        result["pdk"] = p_k.group(1).strip()
-        
-    return result
 
 def draw_door_in_frame(drawer: EzdxfDrawer, view_name: str, p: Dict, is_back: bool, use_light_size: bool = False, light_w: int = 0, light_h: int = 0):
     drawer.update_progress(f"开始绘制{view_name}门体...")
@@ -1258,7 +1005,7 @@ def parse_dim_str(val_str: str, default_out: float, default_in: float) -> Tuple[
         return (default_out, default_in)
 
 
-# ===================== 表单复用组件 =====================
+# ===================== 复用排版表单组件 =====================
 def render_main_form(options_mgr):
     col_left, col_mid, col_right = st.columns([1, 1, 1])
     with col_left:
@@ -1714,7 +1461,7 @@ def generate_cad_trigger(history_mgr):
     return info_map, check_map, draw_params
 
 
-# ===================== 登录拦截 =====================
+# ===================== 后台管理与登录界面 =====================
 def render_login():
     st.markdown("<div style='height: 10vh;'></div>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align:center; color:#1C1C1E; font-weight:700;'>🏭 西州将军 - 智能协同平台</h2>", unsafe_allow_html=True)
@@ -1775,7 +1522,6 @@ def render_admin_dashboard():
                         user_db.delete_user(u_id)
                         st.rerun()
 
-
 # ===================== 顶部高级导航栏 =====================
 def render_top_nav():
     st.markdown("<div style='padding-top:10px;'></div>", unsafe_allow_html=True)
@@ -1797,25 +1543,25 @@ def render_top_nav():
         if st.session_state["current_module"] == item["module"]:
             is_active = True
             
+        cls_name = "nav-btn-active" if is_active else "nav-btn-inactive"
         with cols[i]:
-            if is_active:
-                if st.button(item["title"], use_container_width=True, type="primary", key=f"nav_{item['module']}"):
-                    pass
-            else:
-                if st.button(item["title"], use_container_width=True, type="secondary", key=f"nav_{item['module']}"):
-                    st.session_state["current_module"] = item["module"]
-                    st.session_state["active_task_id"] = None
-                    st.rerun()
+            st.markdown(f'<div class="{cls_name}">', unsafe_allow_html=True)
+            if st.button(item["title"], use_container_width=True, key=f"nav_{item['module']}"):
+                st.session_state["current_module"] = item["module"]
+                st.session_state["active_task_id"] = None
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
     with cols[-1]:
-        st.markdown(f"<div style='text-align:right; color:#8E8E93; font-size:13px; margin-top:2px;'>{st.session_state['user_name']}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align:right; color:#8E8E93; font-size:13px; margin-top:2px;'>👤 {st.session_state['user_name']}</div>", unsafe_allow_html=True)
         if st.button("退出登录", use_container_width=True):
             st.session_state["logged_in"] = False
             st.rerun()
             
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
-# ===================== 主程序 =====================
+
+# ===================== 核心主程序 =====================
 def main():
     st.set_page_config(page_title="西州将军 | 协同平台", layout="wide")
     init_session_state()
@@ -1829,7 +1575,6 @@ def main():
 
     history_mgr = HistoryManager(HISTORY_FILE)
     options_mgr = CustomOptionsManager(CUSTOM_OPTIONS_FILE)
-
     current_module = st.session_state.get("current_module")
 
     # ==================== 模块 0：后台管理 ====================
@@ -1841,20 +1586,19 @@ def main():
 
     # ==================== 模块 1：图纸信息录入 ====================
     elif current_module == "图纸信息录入":
-        batch_text = st.text_input("✨ 智能文本识别", placeholder="粘贴销售聊天记录，回车自动解析并填充参数...", label_visibility="collapsed")
-        if batch_text:
-            parsed = parse_batch_text(batch_text)  
-            if parsed:
-                for k, v in parsed.items(): 
-                    st.session_state[k] = v
-                st.rerun()
+        st.markdown("#### 🖼️ 客户参考图上传 (支持拖拽与 Ctrl+V 快捷粘贴)")
+        ref_img_file = st.file_uploader(" ", type=['jpg', 'png', 'jpeg'], accept_multiple_files=False, key="upload_ref")
         
-        st.markdown("#### 🖼️ 客户沟通记录与参考图")
-        ref_img_file = st.file_uploader("📥 拖拽图片到此处，或点击框内按 Ctrl+V (Mac按 Cmd+V) 直接粘贴截图", type=['jpg', 'png', 'jpeg'], accept_multiple_files=False)
         ref_img_b64 = None
         if ref_img_file is not None:
             ref_img_b64 = base64.b64encode(ref_img_file.getvalue()).decode('utf-8')
-            st.success("参考图已就绪！将随订单一起提交。")
+            c_thumb, c_btn = st.columns([2, 8])
+            with c_thumb:
+                st.image(ref_img_file, width=150)
+            with c_btn:
+                st.success("✅ 参考图已就绪！")
+                if st.button("🔍 放大查看"):
+                    show_image_modal(ref_img_b64)
             
         st.divider()
         render_main_form(options_mgr)
@@ -1908,18 +1652,21 @@ def main():
                 st.markdown(f"<h4 style='margin-bottom:0;'>正在处理：{active_task['customer']} - {active_task['project']} {get_status_badge(active_task['status'])}</h4>", unsafe_allow_html=True)
                 
             if active_task.get("ref_img_b64"):
-                with st.expander("🖼️ 查看前端销售上传的参考图 / 沟通记录"):
-                    try:
-                        ref_bytes = base64.b64decode(active_task["ref_img_b64"])
-                        st.image(ref_bytes, use_column_width=True)
-                    except Exception:
-                        pass
+                st.markdown("**前端客户参考图：**")
+                c_thumb, c_btn = st.columns([2, 8])
+                with c_thumb:
+                    st.image(base64.b64decode(active_task["ref_img_b64"]), width=120)
+                with c_btn:
+                    if st.button("🔍 放大查看参考图", key="view_ref_draw"):
+                        show_image_modal(active_task["ref_img_b64"])
                 
             if active_task['status'] == "待修改" and active_task['review_feedback']: 
                 st.error(f"🛑 审核驳回意见：\n\n{active_task['review_feedback']}")
 
             render_main_form(options_mgr)
             
+            st.divider()
+            st.markdown("#### 📤 深化图纸提交 (支持拖拽/Ctrl+V)")
             c_gen, c_upload = st.columns([1, 1])
             with c_gen:
                 if st.button("⚡ 生成基准 CAD 底图", type="secondary", use_container_width=True):
@@ -1931,8 +1678,11 @@ def main():
                         st.download_button("⬇️ 下载 DXF 进行深化", data=buffer.getvalue(), file_name=f"基准图纸_{active_task['id']}.dxf", mime="application/dxf", use_container_width=True)
             
             with c_upload:
-                uploaded_file = st.file_uploader("📥 上传深化完成的图纸图片 (支持拖拽/截图粘贴)，提交给总工审核", label_visibility="collapsed")
-                if st.button("📤 提交审核", type="primary", use_container_width=True):
+                uploaded_file = st.file_uploader(" ", type=["jpg", "png", "jpeg"], label_visibility="collapsed", key="upload_draw")
+                if uploaded_file is not None:
+                    st.image(uploaded_file, width=120)
+                
+                if st.button("📤 提交给总工审核", type="primary", use_container_width=True):
                     if uploaded_file is not None:
                         img_b64 = base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
                         task_db.update_task(active_task["id"], {
@@ -1993,24 +1743,27 @@ def main():
                 
             c_img, c_info = st.columns([6, 4])
             with c_img:
-                st.markdown("#### 图纸预览")
-                st.caption("🔍 提示：鼠标停在图片上，点击右上角 `⤢` 即可全屏放大。")
+                st.markdown("#### 图纸全屏预览")
                 if active_task.get("drawing_img_b64"):
-                    try:
-                        img_bytes = base64.b64decode(active_task["drawing_img_b64"])
-                        st.image(img_bytes, use_column_width=True)
-                    except Exception: 
-                        st.info("图片解析失败。")
+                    c_t, c_b = st.columns([3, 7])
+                    with c_t:
+                        st.image(base64.b64decode(active_task["drawing_img_b64"]), width=150)
+                    with c_b:
+                        if st.button("🔍 放大审查深化图", type="primary", key="view_main"):
+                            show_image_modal(active_task["drawing_img_b64"])
                 else: 
-                    st.warning("绘图员未上传预览图。")
+                    st.warning("绘图员未上传深化图。")
                     
+                st.markdown("#### 客户原单参考图")
                 if active_task.get("ref_img_b64"):
-                    with st.expander("🖼️ 查看前端录入的原单/参考图"):
-                        try:
-                            ref_bytes = base64.b64decode(active_task["ref_img_b64"])
-                            st.image(ref_bytes, use_column_width=True)
-                        except Exception:
-                            pass
+                    c_rt, c_rb = st.columns([3, 7])
+                    with c_rt:
+                        st.image(base64.b64decode(active_task["ref_img_b64"]), width=150)
+                    with c_rb:
+                        if st.button("🔍 查看客户原图", type="secondary", key="view_ref"):
+                            show_image_modal(active_task["ref_img_b64"])
+                else:
+                    st.info("销售未上传参考图。")
             
             with c_info:
                 st.markdown("#### 核心参数核对")
