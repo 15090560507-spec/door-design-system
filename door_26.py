@@ -1,9 +1,10 @@
 """
-西州将军铜门 - 生产协同管理系统 (SaaS 影像交互强化版)
-- 优化：移除文本解析，专注表单。
-- 优化：上传控件重构为方形极简框，支持原生 Ctrl+V 截图粘贴。
-- 优化：全链路缩略图展示，点击调用原生 Dialog 弹窗查看大图。
-- 绝对无分号压缩，100% 遵循规范。
+西州将军铜门 - 生产图纸协同系统 (SaaS 尊享视觉优化版)
+- 优化：移除文本智能解析功能，界面极致清爽。
+- 优化：顶部导航栏增加物理级按压反馈与高亮对比。
+- 优化：绘图流转模块拆分为上下两部分（生成基准 -> 提交深化）。
+- 优化：全链路原生图片点击放大，移除多余交互按钮。
+- 绝对无分号压缩，100% 遵循 PEP8 规范。
 """
 import sys
 import os
@@ -31,16 +32,6 @@ HISTORY_FILE = os.path.join(DATA_DIR, 'order_history.json')
 CUSTOM_OPTIONS_FILE = os.path.join(DATA_DIR, 'custom_options.json')
 TASKS_DB_FILE = os.path.join(DATA_DIR, 'tasks_database.json')
 USERS_DB_FILE = os.path.join(DATA_DIR, 'users_database.json')
-
-# ===================== 原生弹窗组件 (Lightbox) =====================
-# 这是 Streamlit 原生的弹窗装饰器，点击后会悬浮在页面正中央
-@st.dialog("高清图纸审查", width="large")
-def show_image_modal(b64_str: str):
-    try:
-        img_bytes = base64.b64decode(b64_str)
-        st.image(img_bytes, use_column_width=True)
-    except Exception:
-        st.error("图片解析失败")
 
 # ===================== 核心配置 =====================
 @dataclass
@@ -72,7 +63,7 @@ class Config:
 
 CONFIG = Config()
 
-# ===================== 数据库管理引擎 =====================
+# ===================== 数据库引擎：用户权限 =====================
 class UserDatabaseManager:
     def __init__(self, file_path):
         self.file_path = file_path
@@ -128,6 +119,7 @@ class UserDatabaseManager:
 
 user_db = UserDatabaseManager(USERS_DB_FILE)
 
+# ===================== 数据库引擎：任务流转 =====================
 class TaskDatabaseManager:
     def __init__(self, file_path):
         self.file_path = file_path
@@ -175,9 +167,11 @@ class TaskDatabaseManager:
 
 task_db = TaskDatabaseManager(TASKS_DB_FILE)
 
+# ===================== 本地字典记忆类 =====================
 class HistoryManager:
     def __init__(self, file_path):
         self.file_path = file_path
+
     def load(self):
         if os.path.exists(self.file_path):
             try:
@@ -186,12 +180,14 @@ class HistoryManager:
             except Exception:
                 return {"dhdw": [], "gdmc": [], "ys": []}
         return {"dhdw": [], "gdmc": [], "ys": []}
+
     def save(self, history):
         try:
             with open(self.file_path, 'w', encoding='utf-8') as f:
                 json.dump(history, f, ensure_ascii=False, indent=2)
         except Exception:
             pass
+
     def add(self, field, value):
         if not value.strip():
             return
@@ -206,6 +202,7 @@ class HistoryManager:
 class CustomOptionsManager:
     def __init__(self, file_path):
         self.file_path = file_path
+
     def load(self):
         if os.path.exists(self.file_path):
             try:
@@ -214,12 +211,14 @@ class CustomOptionsManager:
             except Exception:
                 return {"materials": [], "handles": [], "hinges": []}
         return {"materials": [], "handles": [], "hinges": []}
+
     def save(self, options):
         try:
             with open(self.file_path, 'w', encoding='utf-8') as f:
                 json.dump(options, f, ensure_ascii=False, indent=2)
         except Exception:
             pass
+
     def _add(self, key, value):
         if not value.strip():
             return
@@ -230,57 +229,66 @@ class CustomOptionsManager:
             options[key].insert(0, value)
             options[key] = options[key][:30]
         self.save(options)
+
     def add_material(self, value):
         self._add("materials", value)
+
     def add_handle(self, value):
         self._add("handles", value)
+
     def add_hinge(self, value):
         self._add("hinges", value)
+
     def get_all_materials(self):
         custom = self.load().get("materials", [])
         return list(dict.fromkeys(custom + CONFIG.MATERIAL_OPTIONS.copy()))
+
     def get_all_handles(self):
         custom = self.load().get("handles", [])
         return list(dict.fromkeys(custom + CONFIG.HANDLE_OPTIONS.copy()))
+
     def get_all_hinges(self):
         custom = self.load().get("hinges", [])
         return list(dict.fromkeys(custom + list(CONFIG.HINGE_TYPES.keys())))
 
 
-# ===================== 核心样式定制 (Apple/iOS 风格) =====================
+# ===================== UI 深度重构高级系统 (Apple Style) =====================
 def set_custom_style():
     st.markdown("""
     <style>
+    /* 全局高级背景调色与字体 */
     .stApp { 
         background-color: #F2F2F7; 
         font-family: "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
     }
     
+    /* 隐藏默认占位 */
     header, footer, .stDeployButton { visibility: hidden !important; display: none !important; }
-    
-    /* ======== 导航栏方形按钮 ======== */
+
+    /* ======== 导航栏方形按钮 (物理按压质感) ======== */
     .nav-btn-active > button {
-        background-color: #1C1C1E !important;
+        background-color: #007AFF !important;
         color: #FFFFFF !important;
         border: none !important;
         border-radius: 8px !important;
         font-weight: 600 !important;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.15) !important;
-        transition: transform 0.1s ease;
+        /* 模拟被深深按下去的内阴影状态 */
+        box-shadow: inset 0 4px 6px rgba(0,0,0,0.3) !important;
+        transform: translateY(2px) !important;
     }
-    .nav-btn-active > button:active { transform: scale(0.95); }
 
     .nav-btn-inactive > button {
         background-color: #FFFFFF !important;
-        color: #8E8E93 !important;
-        border: 1px solid #E5E5EA !important;
+        color: #1C1C1E !important;
+        border: 1px solid #C7C7CC !important;
         border-radius: 8px !important;
         font-weight: 500 !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
         transition: all 0.2s ease;
     }
     .nav-btn-inactive > button:hover {
-        color: #1C1C1E !important;
-        border-color: #C7C7CC !important;
+        background-color: #F2F2F7 !important;
+        border-color: #8E8E93 !important;
     }
 
     /* ======== 表单卡片悬浮与边缘 ======== */
@@ -290,6 +298,10 @@ def set_custom_style():
         border: 1px solid rgba(0,0,0,0.05) !important;
         box-shadow: 0 4px 20px rgba(0,0,0,0.03) !important; 
         padding: 20px 24px !important;
+        transition: box-shadow 0.3s ease;
+    }
+    div[data-testid="stVerticalBlock"] > div > div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+        box-shadow: 0 8px 30px rgba(0,0,0,0.08) !important;
     }
     
     /* ======== 输入框明确边界重写 ======== */
@@ -312,30 +324,38 @@ def set_custom_style():
         color: #8E8E93 !important; 
         margin-bottom: -2px !important; 
     }
+    h4 { 
+        font-size: 17px !important; 
+        font-weight: 600 !important; 
+        color: #1C1C1E !important; 
+        margin-bottom: 16px !important; 
+        padding-bottom: 10px !important; 
+        border-bottom: 1px solid #F2F2F7; 
+    }
 
-    /* ======== 方形极简上传框定制 ======== */
+    /* ======== 紧凑型上传框定制 ======== */
     [data-testid="stFileUploader"] {
         width: 100% !important;
     }
     [data-testid="stFileUploader"] section {
-        padding: 1.5rem !important;
+        padding: 1rem !important;
         background-color: #FAFAFC !important;
         border: 2px dashed #C7C7CC !important;
-        border-radius: 12px !important;
+        border-radius: 8px !important;
         display: flex !important;
         flex-direction: column !important;
         align-items: center !important;
         justify-content: center !important;
-        min-height: 120px !important;
+        min-height: 80px !important; /* 极大压缩高度 */
     }
-    [data-testid="stFileUploader"] section:hover { border-color: #007AFF !important; }
+    [data-testid="stFileUploader"] section:hover { border-color: #007AFF !important; background-color: #F0F8FF !important; }
     [data-testid="stFileUploader"] section > div > span { display: none !important; } 
     [data-testid="stFileUploader"] section > div > small { display: none !important; } 
     [data-testid="stFileUploader"] section > button { display: none !important; }
     
     /* 伪造里面的提示文字 */
     [data-testid="stFileUploader"] section::before {
-        content: "➕ 点击框内 Ctrl+V 粘贴 / 或拖拽图片至此";
+        content: "➕ 拖拽图片至此 / 或点击后按 Ctrl+V 粘贴";
         color: #8E8E93;
         font-weight: 600;
         font-size: 14px;
@@ -364,11 +384,15 @@ def set_custom_style():
         border-radius: 10px !important;
         text-align: left !important;
         padding: 16px 20px !important;
+        height: 100% !important;
         color: #1C1C1E !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02) !important;
+        transition: all 0.2s ease;
     }
     .drawing-card-btn > button:hover {
         border-color: #007AFF !important;
         box-shadow: 0 6px 16px rgba(0, 122, 255, 0.1) !important;
+        transform: translateY(-2px);
     }
     .delete-btn > button {
         background-color: #FFF0F0 !important; color: #FF3B30 !important; border: 1px solid #FFD1D1 !important; border-radius: 10px !important;
@@ -432,6 +456,7 @@ def get_status_badge(status):
     }
     css_class = mapping.get(status, "badge-pending")
     return f'<span class="badge {css_class}">{status}</span>'
+
 
 # ===================== 绘图底层支持组件 =====================
 class DimensionCalculator:
@@ -1005,7 +1030,7 @@ def parse_dim_str(val_str: str, default_out: float, default_in: float) -> Tuple[
         return (default_out, default_in)
 
 
-# ===================== 复用排版表单组件 =====================
+# ===================== 表单复用组件 =====================
 def render_main_form(options_mgr):
     col_left, col_mid, col_right = st.columns([1, 1, 1])
     with col_left:
@@ -1461,7 +1486,7 @@ def generate_cad_trigger(history_mgr):
     return info_map, check_map, draw_params
 
 
-# ===================== 后台管理与登录界面 =====================
+# ===================== 登录拦截与后台 =====================
 def render_login():
     st.markdown("<div style='height: 10vh;'></div>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align:center; color:#1C1C1E; font-weight:700;'>🏭 西州将军 - 智能协同平台</h2>", unsafe_allow_html=True)
@@ -1586,19 +1611,14 @@ def main():
 
     # ==================== 模块 1：图纸信息录入 ====================
     elif current_module == "图纸信息录入":
-        st.markdown("#### 🖼️ 客户参考图上传 (支持拖拽与 Ctrl+V 快捷粘贴)")
+        st.markdown("#### 🖼️ 客户参考图 (截图直接粘贴至下方框内)")
         ref_img_file = st.file_uploader(" ", type=['jpg', 'png', 'jpeg'], accept_multiple_files=False, key="upload_ref")
         
         ref_img_b64 = None
         if ref_img_file is not None:
             ref_img_b64 = base64.b64encode(ref_img_file.getvalue()).decode('utf-8')
-            c_thumb, c_btn = st.columns([2, 8])
-            with c_thumb:
-                st.image(ref_img_file, width=150)
-            with c_btn:
-                st.success("✅ 参考图已就绪！")
-                if st.button("🔍 放大查看"):
-                    show_image_modal(ref_img_b64)
+            # 移除文字提示，直接原生渲染，依靠 Streamlit 自身的点击放大功能
+            st.image(ref_img_file, use_column_width=True)
             
         st.divider()
         render_main_form(options_mgr)
@@ -1652,13 +1672,12 @@ def main():
                 st.markdown(f"<h4 style='margin-bottom:0;'>正在处理：{active_task['customer']} - {active_task['project']} {get_status_badge(active_task['status'])}</h4>", unsafe_allow_html=True)
                 
             if active_task.get("ref_img_b64"):
-                st.markdown("**前端客户参考图：**")
-                c_thumb, c_btn = st.columns([2, 8])
-                with c_thumb:
-                    st.image(base64.b64decode(active_task["ref_img_b64"]), width=120)
-                with c_btn:
-                    if st.button("🔍 放大查看参考图", key="view_ref_draw"):
-                        show_image_modal(active_task["ref_img_b64"])
+                st.markdown("**前端客户参考图 (点击图片放大)：**")
+                try:
+                    ref_bytes = base64.b64decode(active_task["ref_img_b64"])
+                    st.image(ref_bytes, use_column_width=True)
+                except Exception:
+                    pass
                 
             if active_task['status'] == "待修改" and active_task['review_feedback']: 
                 st.error(f"🛑 审核驳回意见：\n\n{active_task['review_feedback']}")
@@ -1666,23 +1685,26 @@ def main():
             render_main_form(options_mgr)
             
             st.divider()
-            st.markdown("#### 📤 深化图纸提交 (支持拖拽/Ctrl+V)")
-            c_gen, c_upload = st.columns([1, 1])
-            with c_gen:
-                if st.button("⚡ 生成基准 CAD 底图", type="secondary", use_container_width=True):
+            
+            # --- 垂直分离的功能块 ---
+            with st.container(border=True):
+                st.markdown("#### ⚡ 第 1 步：生成基准 CAD 底图")
+                if st.button("⬇️ 生成并下载 DXF 进行深化", type="secondary", use_container_width=True):
                     info_map, check_map, draw_params = generate_cad_trigger(history_mgr)
                     def prog_cb(m): 
                         pass
                     result, buffer = run_integrated_system(info_map, check_map, draw_params, prog_cb)
                     if buffer: 
-                        st.download_button("⬇️ 下载 DXF 进行深化", data=buffer.getvalue(), file_name=f"基准图纸_{active_task['id']}.dxf", mime="application/dxf", use_container_width=True)
+                        st.download_button("⬇️ 确认下载 DXF", data=buffer.getvalue(), file_name=f"基准图纸_{active_task['id']}.dxf", mime="application/dxf", use_container_width=True)
             
-            with c_upload:
+            with st.container(border=True):
+                st.markdown("#### 📤 第 2 步：上传深化后的图纸并提交")
                 uploaded_file = st.file_uploader(" ", type=["jpg", "png", "jpeg"], label_visibility="collapsed", key="upload_draw")
                 if uploaded_file is not None:
-                    st.image(uploaded_file, width=120)
+                    # 原生渲染即可放大
+                    st.image(uploaded_file, use_column_width=True)
                 
-                if st.button("📤 提交给总工审核", type="primary", use_container_width=True):
+                if st.button("✅ 提交给总工审核", type="primary", use_container_width=True):
                     if uploaded_file is not None:
                         img_b64 = base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
                         task_db.update_task(active_task["id"], {
@@ -1694,7 +1716,7 @@ def main():
                         st.success("成功提交给总工！")
                         st.rerun()
                     else: 
-                        st.warning("请先上传图纸文件！")
+                        st.warning("请先在上方框内粘贴或上传图纸图片！")
                             
         else:
             filter_date = st.date_input("检索日期", value=datetime.date.today())
@@ -1743,25 +1765,23 @@ def main():
                 
             c_img, c_info = st.columns([6, 4])
             with c_img:
-                st.markdown("#### 图纸全屏预览")
+                st.markdown("#### 图纸全屏预览 (点击图片放大)")
                 if active_task.get("drawing_img_b64"):
-                    c_t, c_b = st.columns([3, 7])
-                    with c_t:
-                        st.image(base64.b64decode(active_task["drawing_img_b64"]), width=150)
-                    with c_b:
-                        if st.button("🔍 放大审查深化图", type="primary", key="view_main"):
-                            show_image_modal(active_task["drawing_img_b64"])
+                    try:
+                        img_bytes = base64.b64decode(active_task["drawing_img_b64"])
+                        st.image(img_bytes, use_column_width=True)
+                    except Exception: 
+                        st.info("图片解析失败。")
                 else: 
                     st.warning("绘图员未上传深化图。")
                     
                 st.markdown("#### 客户原单参考图")
                 if active_task.get("ref_img_b64"):
-                    c_rt, c_rb = st.columns([3, 7])
-                    with c_rt:
-                        st.image(base64.b64decode(active_task["ref_img_b64"]), width=150)
-                    with c_rb:
-                        if st.button("🔍 查看客户原图", type="secondary", key="view_ref"):
-                            show_image_modal(active_task["ref_img_b64"])
+                    try:
+                        ref_bytes = base64.b64decode(active_task["ref_img_b64"])
+                        st.image(ref_bytes, use_column_width=True)
+                    except Exception:
+                        pass
                 else:
                     st.info("销售未上传参考图。")
             
