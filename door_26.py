@@ -1,5 +1,5 @@
 """
-西州将军铜门 - 生产下单系统 (云端无损平替版)
+西州将军铜门 - 生产下单系统 (云端无损平替版 - UI优化版)
 - 完全保留原版所有功能、计算逻辑和 UI 界面。
 - 底层平滑切换为 ezdxf，完美支持 Streamlit Cloud 部署下载。
 - 修复了单门背面合页方向错误的 Bug。
@@ -8,6 +8,7 @@
 - [NEW] 新增标配拉手自动插入功能，自动判断开向，精准放置 ZBPLS 与 YBPLS 块。
 - [NEW] 修复高低槛复选框属性名为 GDK。
 - [NEW] 调整气窗标注规则：分为上下两段且只显示数字。
+- [UI排版优化]：头部订单信息、右侧清单侧边栏、左侧参数与生成工作区。
 """
 import sys
 import os
@@ -993,15 +994,20 @@ def parse_dim_str(val_str: str, default_out: float, default_in: float) -> Tuple[
         return (default_out, default_in)
 
 
-# ===================== Streamlit 界面 =====================
+# ===================== Streamlit 界面重构 =====================
 def set_custom_style():
     st.markdown("""
     <style>
-    .stApp { max-width: 1400px; margin: 0 auto; padding: 20px 40px; background-color: #f8f9fa; }
-    .stForm { background-color: #ffffff; padding: 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .stApp { max-width: 1500px; margin: 0 auto; padding: 20px 40px; background-color: #f0f2f5; }
+    
+    /* 顶部表单卡片样式 */
+    .header-card { background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid #e0e0e0;}
+    
+    /* 右侧配置清单表格样式感 */
+    .right-panel { background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); border: 1px solid #e0e0e0;}
+    
     .stButton>button { border-radius: 8px; padding: 8px 24px; font-weight: 500; }
     .progress-text { font-size: 12px; color: #6c757d; }
-    div[data-testid="stHorizontalBlock"] > div:first-child { padding-right: 16px; }
     
     /* 隐藏右上角元素 */
     .stDeployButton {display:none !important;}  
@@ -1033,356 +1039,334 @@ def init_session_state():
     for key, value in defaults.items():
         if key not in st.session_state: st.session_state[key] = value
 
-
 def main():
     init_session_state()
     set_custom_style()
-    st.set_page_config(page_title="西州将军智能下单系统", layout="wide")
     st.title("西州将军铜门 - 生产下单系统")
 
     history_mgr = HistoryManager(HISTORY_FILE)
     options_mgr = CustomOptionsManager(CUSTOM_OPTIONS_FILE)
 
-    with st.container():
-        st.subheader("批量参数输入")
-        batch_text = st.text_area("批量输入", height=80,
-                                  placeholder="示例：订货单位胡燕 工地名称曹操 0.8的不锈钢镀铜 红古铜 标配拉手 对开门内右开 洞口宽1000*2600")
-        col_parse, _ = st.columns([1, 8])
-        with col_parse:
-            if st.button("解析填充", type="primary"):
-                parsed = parse_batch_text(batch_text)
-                if parsed:
-                    for key, value in parsed.items():
-                        if key in st.session_state: st.session_state[key] = value
-                    st.success(f"已解析并填充 {len(parsed)} 个参数")
-                    st.rerun()
-                else:
-                    st.warning("未能解析到有效参数，请检查输入格式")
-    st.divider()
-
-    st.subheader("基础信息")
-    col1, col2, col3, col4, col5 = st.columns(5)
+    # ==================== 1. 顶部表头区域 (还原图纸顶部) ====================
+    st.markdown('<div class="header-card">', unsafe_allow_html=True)
+    st.markdown("#### 订单基础信息")
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-        dhdw = st.text_input("订货单位", key="dhdw", placeholder="输入订货单位")
+        dhdw = st.text_input("订货单位", key="dhdw")
         if dhdw: history_mgr.add("dhdw", dhdw)
     with col2:
-        gdmc = st.text_input("工地名称", key="gdmc", placeholder="输入工地名称")
-        if gdmc: history_mgr.add("gdmc", gdmc)
-    with col3:
-        ys = st.text_input("颜色", key="ys", placeholder="输入颜色")
-        if ys: history_mgr.add("ys", ys)
-    with col4:
-        dhrq = st.date_input("订货日期", value=datetime.datetime.strptime(st.session_state["dhrq"], "%Y.%m.%d").date())
-        st.session_state["dhrq"] = dhrq.strftime("%Y.%m.%d")
-    with col5:
-        st.text_input("绘图员", key="hhxd")
-
-    col_b1, col_b2, col_b3, col_b4 = st.columns(4)
-    with col_b1:
-        st.text_input("数量 (樘)", key="sl")
-    with col_b2:
-        st.text_input("订单号", key="ddh")
-    with col_b3:
-        st.text_input("墙厚 (mm)", key="qh", placeholder="mm")
-    with col_b4:
-        st.number_input("门扇厚度 (mm)", value=st.session_state.get("mshd", 80), step=5, key="mshd", min_value=0)
-
-    col_c1, col_c2, col_c3, col_c4, col_c5 = st.columns(5)
-    with col_c1:
-        st.text_input("正面款式", key="zmks", value=st.session_state.get("zmks", "按图"))
-    with col_c2:
-        st.text_input("反面款式", key="fmks", value=st.session_state.get("fmks", "按图"))
-
-    col_d1, col_d2, col_d3, col_d4, col_d5 = st.columns(5)
-    with col_d1:
         all_materials = options_mgr.get_all_materials()
         current_mat = st.session_state.get("zzcl", "0.8的不锈钢镀铜")
         mat_idx = all_materials.index(current_mat) if current_mat in all_materials else 0
         selected_mat = st.selectbox("制作材料", all_materials, index=mat_idx, key="zzcl_select")
-        custom_mat = st.text_input("或自定义材料", key="zzcl_custom", placeholder="输入其他材料")
+        custom_mat = st.text_input("自定义材料 (覆盖上方)", key="zzcl_custom", placeholder="输入其他材料", label_visibility="collapsed")
         if custom_mat and custom_mat != selected_mat: selected_mat = custom_mat
-        if selected_mat not in CONFIG.MATERIAL_OPTIONS and selected_mat not in all_materials: options_mgr.add_material(
-            selected_mat)
+        if selected_mat not in CONFIG.MATERIAL_OPTIONS and selected_mat not in all_materials: options_mgr.add_material(selected_mat)
         st.session_state["zzcl"] = selected_mat
-    with col_d2:
+    with col3:
+        dhrq = st.date_input("订货日期", value=datetime.datetime.strptime(st.session_state["dhrq"], "%Y.%m.%d").date())
+        st.session_state["dhrq"] = dhrq.strftime("%Y.%m.%d")
+    with col4:
+        st.text_input("正面款式", key="zmks")
+
+    col5, col6, col7, col8 = st.columns(4)
+    with col5:
+        gdmc = st.text_input("工地名称", key="gdmc")
+        if gdmc: history_mgr.add("gdmc", gdmc)
+    with col6:
+        st.text_input("订单号", key="ddh")
+    with col7:
+        st.text_input("绘图员 (制单人)", key="hhxd")
+    with col8:
+        st.text_input("反面款式", key="fmks")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+    # ==================== 2. 主工作区：左侧多余参数 + 右侧配置清单 ====================
+    col_main, col_side = st.columns([6, 3], gap="large")
+
+    # ---------------- 右侧配置清单 (严格还原图纸右侧表格) ----------------
+    with col_side:
+        st.markdown('<div class="right-panel">', unsafe_allow_html=True)
+        st.markdown("#### 配置清单表")
+        
+        st.selectbox("门型", ["单门", "两定两开", "对开门", "子母门", "折叠四开门"], key="door_type")
+        st.text_input("数量", key="sl")
+        ys = st.text_input("颜色", key="ys")
+        if ys: history_mgr.add("ys", ys)
+        
+        st.markdown("**开向**")
+        ck1, ck2 = st.columns(2)
+        with ck1: st.radio("左右", ["左开", "右开"], horizontal=True, key="sel_kx", label_visibility="collapsed")
+        with ck2: st.radio("内外", ["外开", "内开"], horizontal=True, key="sel_nk", label_visibility="collapsed")
+
+        # 正面拉手
         all_handles = options_mgr.get_all_handles()
         current_zmls = st.session_state.get("zmls", "标配拉手")
         zmls_idx = all_handles.index(current_zmls) if current_zmls in all_handles else 0
         selected_zmls = st.selectbox("正面拉手", all_handles, index=zmls_idx, key="zmls_select")
-        custom_zmls = st.text_input("或自定义正面拉手", key="zmls_custom", placeholder="输入其他拉手")
-        if custom_zmls and custom_zmls != selected_zmls: selected_zmls = custom_zmls
-        if selected_zmls not in CONFIG.HANDLE_OPTIONS and selected_zmls not in all_handles: options_mgr.add_handle(
-            selected_zmls)
+        custom_zmls = st.text_input("自定正面拉手", key="zmls_custom", label_visibility="collapsed", placeholder="输入自定义")
+        if custom_zmls: selected_zmls = custom_zmls
+        if selected_zmls not in CONFIG.HANDLE_OPTIONS and selected_zmls not in all_handles: options_mgr.add_handle(selected_zmls)
         st.session_state["zmls"] = selected_zmls
-    with col_d3:
-        current_fmls = st.session_state.get("fmls", "标配拉手")
+
+        # 反面拉手
+        current_fmls = st.session_state.get("fmls", "背包拉手")
         fmls_idx = all_handles.index(current_fmls) if current_fmls in all_handles else 0
         selected_fmls = st.selectbox("反面拉手", all_handles, index=fmls_idx, key="fmls_select")
-        custom_fmls = st.text_input("或自定义反面拉手", key="fmls_custom", placeholder="输入其他拉手")
-        if custom_fmls and custom_fmls != selected_fmls: selected_fmls = custom_fmls
-        if selected_fmls not in CONFIG.HANDLE_OPTIONS and selected_fmls not in all_handles: options_mgr.add_handle(
-            selected_fmls)
+        custom_fmls = st.text_input("自定反面拉手", key="fmls_custom", label_visibility="collapsed", placeholder="输入自定义")
+        if custom_fmls: selected_fmls = custom_fmls
+        if selected_fmls not in CONFIG.HANDLE_OPTIONS and selected_fmls not in all_handles: options_mgr.add_handle(selected_fmls)
         st.session_state["fmls"] = selected_fmls
-    with col_d4:
+
+        # 锁体
         all_locks = CONFIG.LOCK_OPTIONS.copy()
         current_lock = st.session_state.get("st_val", "标准锁体")
         lock_idx = all_locks.index(current_lock) if current_lock in all_locks else 0
         selected_lock = st.selectbox("锁体", all_locks, index=lock_idx, key="st_val_select")
-        custom_lock = st.text_input("或自定义锁体", key="st_val_custom", placeholder="输入其他锁体")
-        if custom_lock and custom_lock != selected_lock: selected_lock = custom_lock
+        custom_lock = st.text_input("自定锁体", key="st_val_custom", label_visibility="collapsed", placeholder="输入自定义锁")
+        if custom_lock: selected_lock = custom_lock
         st.session_state["st_val"] = selected_lock
-    with col_d5:
+
+        # 合页
         hinge_opts = options_mgr.get_all_hinges()
-        current_hinge = st.session_state.get("sel_hys", "葫芦头合页")
+        current_hinge = st.session_state.get("sel_hys", "暗合页")
         hinge_idx = hinge_opts.index(current_hinge) if current_hinge in hinge_opts else 0
-        selected_hinge = st.selectbox("合页类型", hinge_opts, index=hinge_idx, key="sel_hys_select")
-        custom_hinge = st.text_input("或自定义合页", key="sel_hys_custom", placeholder="输入其他合页")
-        if custom_hinge and custom_hinge != selected_hinge: selected_hinge = custom_hinge
-        if selected_hinge not in CONFIG.HINGE_TYPES and selected_hinge not in hinge_opts: options_mgr.add_hinge(
-            selected_hinge)
+        selected_hinge = st.selectbox("合页样式", hinge_opts, index=hinge_idx, key="sel_hys_select")
+        custom_hinge = st.text_input("自定合页", key="sel_hys_custom", label_visibility="collapsed", placeholder="输入自定义")
+        if custom_hinge: selected_hinge = custom_hinge
+        if selected_hinge not in CONFIG.HINGE_TYPES and selected_hinge not in hinge_opts: options_mgr.add_hinge(selected_hinge)
         st.session_state["sel_hys"] = selected_hinge
-
-    col_e1, col_e2, col_e3, col_e4, col_e5 = st.columns(5)
-    with col_e1:
-        st.selectbox("合页数量", ["2个/扇", "3个/扇", "4个/扇", "5个/扇"], key="hysl")
-    with col_e2:
-        qc_choice = st.radio("气窗", ["无", "玻璃", "封闭"], horizontal=True, key="sel_qc")
-        if qc_choice != "无": st.number_input("气窗高度 (mm)", value=st.session_state.get("qc_height", 400), step=10,
-                                              key="qc_height")
-    with col_e3:
-        mm_option = st.radio("门楣", ["无", "有"], horizontal=True, key="mm_option")
-        has_mm = (mm_option == "有")
-        st.session_state["has_mm"] = has_mm
-        if has_mm: st.number_input("门楣高度 (mm)", value=st.session_state.get("mm_height", 200), step=10,
-                                   key="mm_height")
-    with col_e4:
-        st.radio("包装", ["全包", "木箱"], horizontal=True, key="sel_bz")
-
-    st.write("下槛信息（仅用于图框显示）")
-    col_f1, col_f2 = st.columns(2)
-    with col_f1:
-        threshold_type = st.radio("下槛类型", ["高低槛", "平底槛"], horizontal=True, key="threshold_type")
-    with col_f2:
-        if threshold_type == "高低槛":
-            dxk_gxk = st.text_input("高低槛尺寸 (低/高)", key="dxk_gxk_input",
-                                    value=f"{st.session_state.get('dxk', '55')}/{st.session_state.get('gxk', '75')}")
-            if "/" in dxk_gxk:
-                parts = dxk_gxk.split("/")
-                st.session_state["dxk"] = parts[0].strip();
-                st.session_state["gxk"] = parts[1].strip()
-            else:
-                st.session_state["dxk"] = dxk_gxk; st.session_state["gxk"] = dxk_gxk
-            st.session_state["pdk"] = ""
-        else:
-            pdk = st.text_input("平底槛尺寸 (mm)", key="pdk_input", value=st.session_state.get("pdk", "60"))
-            st.session_state["pdk"] = pdk
-            st.session_state["dxk"] = "";
-            st.session_state["gxk"] = ""
-
-    st.write("备注")
-    sm = st.text_area("备注", key="sm", height=120, placeholder="可输入额外说明，支持多行")
-    st.divider()
-
-    st.subheader("绘图参数")
-    col_p1, col_p2 = st.columns([1, 2])
-    with col_p1:
-        door_type = st.radio("门型", ["单门", "对开门", "子母门", "折叠四开门", "两定两开"], horizontal=True,
-                             key="door_type")
-        if door_type in ["折叠四开门", "两定两开"]: st.number_input("中门宽度 (单扇)",
-                                                                    value=st.session_state.get("mid_door_width", 400),
-                                                                    step=10, key="mid_door_width")
-        if door_type == "子母门": st.number_input("母门宽度", value=st.session_state["mother_door_width"], step=10,
-                                                  key="mother_door_width")
-        if door_type == "两定两开":
-            pillar_option = st.radio("立柱", ["无立柱", "有立柱"], horizontal=True, key="pillar_option")
-            st.session_state["has_pillar"] = (pillar_option == "有立柱")
-            if st.session_state["has_pillar"]: st.text_input("立柱宽度 (外/内)", key="pillar_width_str",
-                                                             value=st.session_state.get("pillar_width_str", "55/70"))
-        else:
-            st.session_state["has_pillar"] = False  
-    with col_p2:
-        col_kx, col_nk = st.columns(2)
-        with col_kx: st.radio("左右开", ["左开", "右开"], horizontal=True, key="sel_kx")
-        with col_nk: st.radio("内外开", ["内开", "外开"], horizontal=True, key="sel_nk")
-
-    st.write("尺寸输入")
-    col_size1, col_size2, col_size3, col_size4 = st.columns([1, 1, 1, 4])
-    with col_size1:
-        use_light = st.checkbox("使用见光尺寸", key="use_light_size")
-    with col_size2:
-        if use_light:
-            st.number_input("见光宽", value=st.session_state.get("light_w", 0), step=10, key="light_w")
-        else:
-            st.number_input("洞口宽", value=st.session_state["dw"], step=10, key="dw")
-    with col_size3:
-        if use_light:
-            st.number_input("见光高", value=st.session_state.get("light_h", 0), step=10, key="light_h")
-        else:
-            st.number_input("洞口高", value=st.session_state["dh"], step=10, key="dh")
-    with col_size4:
-        if use_light: st.caption("见光尺寸标注位置：内开门标在正面，外开门标在背面")
-
-    st.write("门套包边")
-    col_t1, col_t2, col_t3, col_t4, col_t5 = st.columns(5)
-    with col_t1:
-        has_outer = st.checkbox("外包套(正面)", value=st.session_state.get("has_outer", True), key="has_outer")
-    with col_t2:
-        st.number_input("外包宽度", value=st.session_state.get("trim_front_in", 80), step=10, key="trim_front_in",
-                        disabled=not has_outer)
-    with col_t3:
-        has_inner = st.checkbox("内包套(反面)", value=st.session_state.get("has_inner", False), key="has_inner")
-    with col_t4:
-        st.number_input("内包宽度", value=st.session_state.get("trim_back_in", 80), step=10, key="trim_back_in",
-                        disabled=not has_inner)
-    with col_t5:
-        st.number_input("压框宽", value=st.session_state["overlap"], step=1, key="overlap")
-
-    st.write("门框/门槛尺寸（影响绘图）")
-    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
-    with col_f1:
-        st.text_input("左框 (外/内)", key="fw_left_str", value=st.session_state.get("fw_left_str", "60/60"))
-    with col_f2:
-        st.text_input("右框 (外/内)", key="fw_right_str", value=st.session_state.get("fw_right_str", "60/60"))
-    with col_f3:
-        st.text_input("上框 (外/内)", key="fw_top_str", value=st.session_state.get("fw_top_str", "60/60"))
-    with col_f4:
-        st.text_input("下槛 (低/高)", key="th_str", value=st.session_state.get("th_str", "60/60"))
-
-    st.divider()
-    progress_placeholder = st.empty()
-
-    if st.button("生成图纸", type="primary", use_container_width=True):
-        if st.session_state.get("dhdw"): history_mgr.add("dhdw", st.session_state["dhdw"])
-        if st.session_state.get("gdmc"): history_mgr.add("gdmc", st.session_state["gdmc"])
-        if st.session_state.get("ys"): history_mgr.add("ys", st.session_state["ys"])
-
-        outer_width = st.session_state["trim_front_in"] if st.session_state["has_outer"] else 0
-        overlap = st.session_state.get("overlap", 20)
-        press_wall = outer_width - overlap
-        note_line = f"门套宽/压墙/压框={outer_width}/{press_wall}/{overlap}mm"
         
-        current_note = st.session_state.get("sm", "")
-        final_note = current_note + ("\n" + note_line if current_note.strip() else note_line) if note_line not in current_note else current_note
+        st.selectbox("合页数量", ["3个/扇", "2个/扇", "4个/扇", "5个/扇"], key="hysl")
+        
+        st.radio("气窗", ["封闭", "玻璃", "无"], horizontal=True, key="sel_qc")
+        
+        pillar_option = st.radio("立柱", ["无", "有"], horizontal=True, key="pillar_option")
+        st.session_state["has_pillar"] = (pillar_option == "有")
+        
+        mm_option = st.radio("门楣", ["无", "有"], horizontal=True, key="mm_option")
+        st.session_state["has_mm"] = (mm_option == "有")
+        
+        st.markdown("**包边配置**")
+        cb1, cb2 = st.columns(2)
+        with cb1: st.checkbox("外包(正面)", key="has_outer")
+        with cb2: st.checkbox("内包(反面)", key="has_inner")
+        
+        st.text_input("墙厚", key="qh", placeholder="选填(mm)")
+        st.radio("下槛配置", ["高低槛", "平底槛"], horizontal=True, key="threshold_type")
+        st.number_input("门扇厚度 (mm)", value=st.session_state.get("mshd", 80), step=5, key="mshd")
+        st.radio("包装", ["全包", "木箱"], horizontal=True, key="sel_bz")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        trim_front = st.session_state["trim_front_in"] if st.session_state["has_outer"] else 0
-        trim_back = st.session_state["trim_back_in"] if st.session_state["has_inner"] else 0
-        left_out, left_in = parse_dim_str(st.session_state.get("fw_left_str", "60/60"), 60, 60)
-        right_out, right_in = parse_dim_str(st.session_state.get("fw_right_str", "60/60"), 60, 60)
-        fw_top_out, fw_top_in = parse_dim_str(st.session_state.get("fw_top_str", "60/60"), 60, 60)
-        th_out, th_in = parse_dim_str(st.session_state.get("th_str", "60/60"), 60, 60)
 
-        if st.session_state["sel_nk"] == "内开":
-            left_width_front, right_width_front = left_in, right_in
-            left_width_back, right_width_back = left_out, right_out
-            fw_top_front, fw_top_back = fw_top_in, fw_top_out
-            th_front, th_back = th_in, th_out
-        else:
-            left_width_front, right_width_front = left_out, right_out
-            left_width_back, right_width_back = left_in, right_in
-            fw_top_front, fw_top_back = fw_top_out, fw_top_in
-            th_front, th_back = th_out, th_in
+    # ---------------- 左侧参数与画图控制区 (多余参数收纳) ----------------
+    with col_main:
+        # 1. 批量输入工具 (保持顺手位置)
+        st.markdown("#### 🚀 智能批量解析")
+        batch_text = st.text_area("粘贴聊天记录或快速文本", height=68, label_visibility="collapsed",
+                                  placeholder="示例：订货单位胡燕 0.8镀铜 红古铜 标配拉手 对开门外右开 洞口宽1000*2600")
+        if st.button("解析文本并填充", type="secondary"):
+            parsed = parse_batch_text(batch_text)  
+            if parsed:
+                for key, value in parsed.items():
+                    if key in st.session_state: st.session_state[key] = value
+                st.rerun()
 
-        dw, dh = st.session_state["dw"], st.session_state["dh"]
-        if st.session_state.get("use_light_size", False):
-            light_w, light_h = st.session_state.get("light_w", 0), st.session_state.get("light_h", 0)
-            if light_w > 0 and light_h > 0:
-                calc = DimensionCalculator({
-                    "dw": dw, "dh": dh, "left_width_front": left_width_front, "right_width_front": right_width_front,
-                    "left_width_back": left_width_back, "right_width_back": right_width_back,
-                    "fw_top_front": fw_top_front,
-                    "fw_top_back": fw_top_back, "th_front": th_front, "th_back": th_back,
-                    "nk": st.session_state.get("sel_nk", "内开")
-                })
-                dw, dh = calc.calculate_from_light_size(light_w, light_h, st.session_state["sel_nk"] == "外开")
+        st.divider()
 
-        threshold_type = st.session_state.get("threshold_type", "高低槛")
-        if threshold_type == "高低槛":
-            dxk_val, gxk_val, pdk_val = st.session_state.get("dxk", ""), st.session_state.get("gxk", ""), ""
-        else:
-            dxk_val, gxk_val, pdk_val = "", "", st.session_state.get("pdk", "")
+        # 2. 核心图纸参数
+        st.markdown("#### 📐 图纸及附加尺寸参数")
+        cs1, cs2, cs3 = st.columns([1, 1, 1])
+        with cs1:
+            st.checkbox("使用见光尺寸", key="use_light_size")
+            if st.session_state["use_light_size"]:
+                st.number_input("见光宽 (mm)", value=st.session_state.get("light_w", 0), step=10, key="light_w")
+            else:
+                st.number_input("洞口宽 (mm)", value=st.session_state["dw"], step=10, key="dw")
+        with cs2:
+            st.markdown("<br>", unsafe_allow_html=True) # 占位对齐
+            if st.session_state["use_light_size"]:
+                st.number_input("见光高 (mm)", value=st.session_state.get("light_h", 0), step=10, key="light_h")
+            else:
+                st.number_input("洞口高 (mm)", value=st.session_state["dh"], step=10, key="dh")
+        with cs3:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.session_state["door_type"] in ["折叠四开门", "两定两开"]:
+                st.number_input("中门宽(单扇)", value=st.session_state.get("mid_door_width", 400), step=10, key="mid_door_width")
+            if st.session_state["door_type"] == "子母门":
+                st.number_input("母门宽度", value=st.session_state["mother_door_width"], step=10, key="mother_door_width")
+                
+        # 特殊组件参数 (根据右侧选择联动显示)
+        cd1, cd2, cd3 = st.columns(3)
+        with cd1:
+            if st.session_state["has_pillar"]: 
+                st.text_input("立柱宽 (外/内)", key="pillar_width_str", value=st.session_state.get("pillar_width_str", "55/70"))
+            if st.session_state["sel_qc"] != "无": 
+                st.number_input("气窗高 (mm)", value=st.session_state.get("qc_height", 400), step=10, key="qc_height")
+        with cd2:
+            if st.session_state["has_outer"]: 
+                st.number_input("外包套宽", value=st.session_state.get("trim_front_in", 160), step=10, key="trim_front_in")
+            if st.session_state["has_mm"]: 
+                st.number_input("门楣高 (mm)", value=st.session_state.get("mm_height", 200), step=10, key="mm_height")
+        with cd3:
+            if st.session_state["has_inner"]: 
+                st.number_input("内包套宽", value=st.session_state.get("trim_back_in", 140), step=10, key="trim_back_in")
+            if st.session_state["has_outer"] or st.session_state["has_inner"]:
+                st.number_input("压框宽 (mm)", value=st.session_state["overlap"], step=1, key="overlap")
 
-        qh_display = f"{st.session_state.get('qh', '')} mm" if str(st.session_state.get("qh", "")).strip() else ""
-        mshd_display = f"{st.session_state.get('mshd', 80)} mm"
-        door_type_cn = {"单门": "单门", "对开门": "对开门", "子母门": "子母门", "折叠四开门": "折叠四开门",
-                        "两定两开": "两定两开门"}.get(st.session_state.get("door_type", "单门"), "单门")
-        qc_choice = st.session_state.get("sel_qc", "无")
-        qc_height = st.session_state.get("qc_height", 400) if qc_choice != "无" else 0
-        has_mm = st.session_state.get("has_mm", False)
-        mm_height = st.session_state.get("mm_height", 200) if has_mm else 0
+        st.markdown("**门框/门槛截面数据**")
+        cf1, cf2, cf3, cf4 = st.columns(4)
+        with cf1: st.text_input("左框(外/内)", key="fw_left_str", value=st.session_state.get("fw_left_str", "60/60"))
+        with cf2: st.text_input("右框(外/内)", key="fw_right_str", value=st.session_state.get("fw_right_str", "60/60"))
+        with cf3: st.text_input("上框(外/内)", key="fw_top_str", value=st.session_state.get("fw_top_str", "60/60"))
+        with cf4:
+            if st.session_state["threshold_type"] == "高低槛":
+                st.text_input("下槛(低/高)", key="th_str", value=st.session_state.get("th_str", "55/70"))
+            else:
+                st.text_input("平底槛(mm)", key="pdk", value=st.session_state.get("pdk", "60"))
 
-        info_map = {
-            "DHDW": st.session_state.get("dhdw", ""), "GDMC": st.session_state.get("gdmc", ""),
-            "ZZCL": st.session_state.get("zzcl", ""),
-            "DHRQ": st.session_state.get("dhrq", ""), "DDH": st.session_state.get("ddh", ""),
-            "SL": st.session_state.get("sl", ""),
-            "YS": st.session_state.get("ys", ""), "ZMLS": st.session_state.get("zmls", ""),
-            "FMLS": st.session_state.get("fmls", ""),
-            "ST": st.session_state.get("st_val", ""), "HYSL": st.session_state.get("hysl", ""), "QH": qh_display,
-            "MSHD": mshd_display, "HHXD": st.session_state.get("hhxd", ""), "BZ": final_note,
-            "DOOR_TYPE": st.session_state.get("door_type", "单门"),
-            "MOTHER_DOOR_WIDTH": st.session_state.get("mother_door_width", 600),
-            "MID_DOOR_WIDTH": st.session_state.get("mid_door_width", 400),
-            "PILLAR_WIDTH_STR": st.session_state.get("pillar_width_str", "55/70"),
-            "HAS_PILLAR": st.session_state.get("has_pillar", False), "HYYS": st.session_state.get("sel_hys", ""),
-            "DXK": dxk_val, "GXK": gxk_val, 
-            "PXK": pdk_val, 
-            "MX": door_type_cn, "QC_HEIGHT": qc_height,
-            "HAS_MM": has_mm, "MM_HEIGHT": mm_height, "ZMKS": st.session_state.get("zmks", "按图"),
-            "FMKS": st.session_state.get("fmks", "按图"),
-        }
+        st.markdown("**备注说明**")
+        st.text_area("打印附言 (支持多行)", key="sm", height=80, label_visibility="collapsed")
+        
+        st.divider()
+        
+        # 3. 生成与出图按钮
+        progress_placeholder = st.empty()
+        
+        # ===== 图纸生成完整代码嵌入 =====
+        if st.button("🔥 一键生成生产CAD排版图", type="primary", use_container_width=True):
+            if st.session_state.get("dhdw"): history_mgr.add("dhdw", st.session_state["dhdw"])
+            if st.session_state.get("gdmc"): history_mgr.add("gdmc", st.session_state["gdmc"])
+            if st.session_state.get("ys"): history_mgr.add("ys", st.session_state["ys"])
 
-        check_map = {
-            "kx": st.session_state.get("sel_kx", "右开"), "nk": st.session_state.get("sel_nk", "内开"),
-            "qc": qc_choice, "lz": "有" if st.session_state.get("has_pillar", False) else "无",
-            "bz": st.session_state.get("sel_bz", "全包"), "hys": st.session_state.get("sel_hys", "葫芦头合页"),
-            "mm": "有" if has_mm else "无",
-            "bb": (["外"] if st.session_state.get("has_outer") else []) + (
-                ["内"] if st.session_state.get("has_inner") else []),
-            "threshold": st.session_state.get("threshold_type", "高低槛") 
-        }
+            outer_width = st.session_state["trim_front_in"] if st.session_state["has_outer"] else 0
+            overlap = st.session_state.get("overlap", 20)
+            press_wall = outer_width - overlap
+            note_line = f"门套宽/压墙/压框={outer_width}/{press_wall}/{overlap}mm"
+            
+            current_note = st.session_state.get("sm", "")
+            final_note = current_note + ("\n" + note_line if current_note.strip() else note_line) if note_line not in current_note else current_note
 
-        left_gap, right_gap = parse_gap_str(st.session_state.get("left_right_gap_str", "0/0"), 0)
-        top_gap, bottom_gap = parse_gap_str(st.session_state.get("top_bottom_gap_str", "0/0"), 0)
+            trim_front = st.session_state["trim_front_in"] if st.session_state["has_outer"] else 0
+            trim_back = st.session_state["trim_back_in"] if st.session_state["has_inner"] else 0
+            left_out, left_in = parse_dim_str(st.session_state.get("fw_left_str", "60/60"), 60, 60)
+            right_out, right_in = parse_dim_str(st.session_state.get("fw_right_str", "60/60"), 60, 60)
+            fw_top_out, fw_top_in = parse_dim_str(st.session_state.get("fw_top_str", "60/60"), 60, 60)
+            th_out, th_in = parse_dim_str(st.session_state.get("th_str", "60/60"), 60, 60)
 
-        draw_params = {
-            "dw": dw, "dh": dh, "left_width_front": left_width_front, "right_width_front": right_width_front,
-            "left_width_back": left_width_back, "right_width_back": right_width_back, "fw_top_front": fw_top_front,
-            "fw_top_back": fw_top_back, "th_front": th_front, "th_back": th_back, "trim_front": trim_front,
-            "trim_back": trim_back,
-            "overlap": st.session_state.get("overlap", 20), "door_type": st.session_state.get("door_type", "单门"),
-            "mother_door_width": st.session_state.get("mother_door_width", 600),
-            "mid_door_width": st.session_state.get("mid_door_width", 400),
-            "pillar_width_str": st.session_state.get("pillar_width_str", "55/70"),
-            "has_pillar": st.session_state.get("has_pillar", False),
-            "kx": st.session_state.get("sel_kx", "右开"), "nk": st.session_state.get("sel_nk", "内开"), "qc": qc_choice,
-            "qc_height": qc_height,
-            "has_mm": has_mm, "mm_height": mm_height, "hys": st.session_state.get("sel_hys", "葫芦头合页"),
-            "hysl": st.session_state.get("hysl", "3个/扇"),
-            "left_right_gap": (left_gap, right_gap), "top_bottom_gap": (top_gap, bottom_gap),
-            "middle_gap": st.session_state.get("middle_gap", 0),
-            "use_light_size": st.session_state.get("use_light_size", False),
-            "light_w": st.session_state.get("light_w", 0), "light_h": st.session_state.get("light_h", 0),
-            "zmls": st.session_state.get("zmls", "标配拉手"),
-            "fmls": st.session_state.get("fmls", "标配拉手"),
-        }
+            if st.session_state["sel_nk"] == "内开":
+                left_width_front, right_width_front = left_in, right_in
+                left_width_back, right_width_back = left_out, right_out
+                fw_top_front, fw_top_back = fw_top_in, fw_top_out
+                th_front, th_back = th_in, th_out
+            else:
+                left_width_front, right_width_front = left_out, right_out
+                left_width_back, right_width_back = left_in, right_in
+                fw_top_front, fw_top_back = fw_top_out, fw_top_in
+                th_front, th_back = th_out, th_in
 
-        def progress_callback(msg):
-            progress_placeholder.markdown(f'<p class="progress-text">正在: {msg}</p>', unsafe_allow_html=True)
+            dw, dh = st.session_state["dw"], st.session_state["dh"]
+            if st.session_state.get("use_light_size", False):
+                light_w, light_h = st.session_state.get("light_w", 0), st.session_state.get("light_h", 0)
+                if light_w > 0 and light_h > 0:
+                    calc = DimensionCalculator({
+                        "dw": dw, "dh": dh, "left_width_front": left_width_front, "right_width_front": right_width_front,
+                        "left_width_back": left_width_back, "right_width_back": right_width_back,
+                        "fw_top_front": fw_top_front,
+                        "fw_top_back": fw_top_back, "th_front": th_front, "th_back": th_back,
+                        "nk": st.session_state.get("sel_nk", "内开")
+                    })
+                    dw, dh = calc.calculate_from_light_size(light_w, light_h, st.session_state["sel_nk"] == "外开")
 
-        result, buffer = run_integrated_system(info_map, check_map, draw_params, progress_callback)
-        if buffer is not None:
-            st.success(result)
-            st.download_button(
-                label="⬇️ 点击下载 DXF 图纸",
-                data=buffer.getvalue(),
-                file_name=f"门业图纸_{st.session_state.get('ddh', '未命名')}.dxf",
-                mime="application/dxf",
-                type="primary",
-                use_container_width=True
-            )
-        else:
-            st.error(result)
+            threshold_type = st.session_state.get("threshold_type", "高低槛")
+            if threshold_type == "高低槛":
+                dxk_val, gxk_val, pdk_val = st.session_state.get("dxk", ""), st.session_state.get("gxk", ""), ""
+            else:
+                dxk_val, gxk_val, pdk_val = "", "", st.session_state.get("pdk", "")
 
+            qh_display = f"{st.session_state.get('qh', '')} mm" if str(st.session_state.get("qh", "")).strip() else ""
+            mshd_display = f"{st.session_state.get('mshd', 80)} mm"
+            door_type_cn = {"单门": "单门", "对开门": "对开门", "子母门": "子母门", "折叠四开门": "折叠四开门",
+                            "两定两开": "两定两开门"}.get(st.session_state.get("door_type", "单门"), "单门")
+            qc_choice = st.session_state.get("sel_qc", "无")
+            qc_height = st.session_state.get("qc_height", 400) if qc_choice != "无" else 0
+            has_mm = st.session_state.get("has_mm", False)
+            mm_height = st.session_state.get("mm_height", 200) if has_mm else 0
+
+            info_map = {
+                "DHDW": st.session_state.get("dhdw", ""), "GDMC": st.session_state.get("gdmc", ""),
+                "ZZCL": st.session_state.get("zzcl", ""),
+                "DHRQ": st.session_state.get("dhrq", ""), "DDH": st.session_state.get("ddh", ""),
+                "SL": st.session_state.get("sl", ""),
+                "YS": st.session_state.get("ys", ""), "ZMLS": st.session_state.get("zmls", ""),
+                "FMLS": st.session_state.get("fmls", ""),
+                "ST": st.session_state.get("st_val", ""), "HYSL": st.session_state.get("hysl", ""), "QH": qh_display,
+                "MSHD": mshd_display, "HHXD": st.session_state.get("hhxd", ""), "BZ": final_note,
+                "DOOR_TYPE": st.session_state.get("door_type", "单门"),
+                "MOTHER_DOOR_WIDTH": st.session_state.get("mother_door_width", 600),
+                "MID_DOOR_WIDTH": st.session_state.get("mid_door_width", 400),
+                "PILLAR_WIDTH_STR": st.session_state.get("pillar_width_str", "55/70"),
+                "HAS_PILLAR": st.session_state.get("has_pillar", False), "HYYS": st.session_state.get("sel_hys", ""),
+                "DXK": dxk_val, "GXK": gxk_val, 
+                "PXK": pdk_val, 
+                "MX": door_type_cn, "QC_HEIGHT": qc_height,
+                "HAS_MM": has_mm, "MM_HEIGHT": mm_height, "ZMKS": st.session_state.get("zmks", "按图"),
+                "FMKS": st.session_state.get("fmks", "按图"),
+            }
+
+            check_map = {
+                "kx": st.session_state.get("sel_kx", "右开"), "nk": st.session_state.get("sel_nk", "内开"),
+                "qc": qc_choice, "lz": "有" if st.session_state.get("has_pillar", False) else "无",
+                "bz": st.session_state.get("sel_bz", "全包"), "hys": st.session_state.get("sel_hys", "葫芦头合页"),
+                "mm": "有" if has_mm else "无",
+                "bb": (["外"] if st.session_state.get("has_outer") else []) + (
+                    ["内"] if st.session_state.get("has_inner") else []),
+                "threshold": st.session_state.get("threshold_type", "高低槛") 
+            }
+
+            left_gap, right_gap = parse_gap_str(st.session_state.get("left_right_gap_str", "0/0"), 0)
+            top_gap, bottom_gap = parse_gap_str(st.session_state.get("top_bottom_gap_str", "0/0"), 0)
+
+            draw_params = {
+                "dw": dw, "dh": dh, "left_width_front": left_width_front, "right_width_front": right_width_front,
+                "left_width_back": left_width_back, "right_width_back": right_width_back, "fw_top_front": fw_top_front,
+                "fw_top_back": fw_top_back, "th_front": th_front, "th_back": th_back, "trim_front": trim_front,
+                "trim_back": trim_back,
+                "overlap": st.session_state.get("overlap", 20), "door_type": st.session_state.get("door_type", "单门"),
+                "mother_door_width": st.session_state.get("mother_door_width", 600),
+                "mid_door_width": st.session_state.get("mid_door_width", 400),
+                "pillar_width_str": st.session_state.get("pillar_width_str", "55/70"),
+                "has_pillar": st.session_state.get("has_pillar", False),
+                "kx": st.session_state.get("sel_kx", "右开"), "nk": st.session_state.get("sel_nk", "内开"), "qc": qc_choice,
+                "qc_height": qc_height,
+                "has_mm": has_mm, "mm_height": mm_height, "hys": st.session_state.get("sel_hys", "葫芦头合页"),
+                "hysl": st.session_state.get("hysl", "3个/扇"),
+                "left_right_gap": (left_gap, right_gap), "top_bottom_gap": (top_gap, bottom_gap),
+                "middle_gap": st.session_state.get("middle_gap", 0),
+                "use_light_size": st.session_state.get("use_light_size", False),
+                "light_w": st.session_state.get("light_w", 0), "light_h": st.session_state.get("light_h", 0),
+                "zmls": st.session_state.get("zmls", "标配拉手"),
+                "fmls": st.session_state.get("fmls", "标配拉手"),
+            }
+
+            def progress_callback(msg):
+                progress_placeholder.markdown(f'<p class="progress-text">正在: {msg}</p>', unsafe_allow_html=True)
+
+            result, buffer = run_integrated_system(info_map, check_map, draw_params, progress_callback)
+            if buffer is not None:
+                st.success(result)
+                st.download_button(
+                    label="⬇️ 点击下载 DXF 图纸",
+                    data=buffer.getvalue(),
+                    file_name=f"门业图纸_{st.session_state.get('ddh', '未命名')}.dxf",
+                    mime="application/dxf",
+                    type="primary",
+                    use_container_width=True
+                )
+            else:
+                st.error(result)
 
 if __name__ == "__main__":
     main()
